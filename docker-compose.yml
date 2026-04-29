@@ -47,7 +47,16 @@ services:
   k3s:
     image: rancher/k3s:v1.29.3-k3s1
     container_name: weblaunch-k3s
-    command: server --disable traefik --disable servicelb --write-kubeconfig-mode 644 --tls-san=k3s --tls-san=weblaunch-k3s
+    entrypoint: /bin/sh
+    command: >
+      -c "
+      mkdir -p /etc/rancher/k3s &&
+      echo 'mirrors:
+        \"registry:5000\":
+          endpoint:
+            - \"http://registry:5000\"' > /etc/rancher/k3s/registries.yaml &&
+      exec /bin/k3s server --write-kubeconfig-mode 644 --tls-san=k3s --tls-san=weblaunch-k3s
+      "
     privileged: true
     restart: unless-stopped
     environment:
@@ -58,6 +67,8 @@ services:
       - k3s-config:/output
     ports:
       - "6443:6443"
+      - "8081:80"
+      - "8443:443"
     networks:
       - weblaunch-net
     labels:
@@ -106,6 +117,19 @@ services:
     labels:
       <<: *labels
       com.weblaunch.service: "backend"
+
+  # ── Local Registry (for K8s to pull images) ────────────────
+  registry:
+    image: registry:2
+    container_name: weblaunch-registry
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    networks:
+      - weblaunch-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "registry"
 
   # ── Redis (Job Queue + Store) ──────────────────────────────
   redis:

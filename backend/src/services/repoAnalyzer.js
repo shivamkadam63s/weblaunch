@@ -45,6 +45,24 @@ async function analyzeRepository(repoUrl, branch = "main") {
     const hasDockerfile = await fs.pathExists(path.join(tmpDir, "Dockerfile"));
     const hasDockerCompose = await fs.pathExists(path.join(tmpDir, "docker-compose.yml")) || await fs.pathExists(path.join(tmpDir, "docker-compose.yaml"));
     const detected = detectStack(relFiles, pkg, requirements);
+
+    // Refine start command for Node.js
+    if (detected.stack === "nodejs" && pkg) {
+      if (pkg.scripts?.start) {
+        detected.startCmd = "npm start";
+      } else if (pkg.main && (await fs.pathExists(path.join(tmpDir, pkg.main)))) {
+        detected.startCmd = `node ${pkg.main}`;
+      } else {
+        const commonEntries = ["index.js", "server.js", "app.js", "src/index.js", "src/server.js"];
+        for (const entry of commonEntries) {
+          if (await fs.pathExists(path.join(tmpDir, entry))) {
+            detected.startCmd = `node ${entry}`;
+            break;
+          }
+        }
+      }
+    }
+
     return { ...detected, hasDockerfile, hasDockerCompose, files: relFiles.slice(0, 50), totalFiles: relFiles.length, packageJson: pkg ? { name: pkg.name, version: pkg.version, scripts: pkg.scripts } : null };
   } finally {
     await fs.remove(tmpDir).catch(() => {});

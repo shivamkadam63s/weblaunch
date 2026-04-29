@@ -32,6 +32,7 @@ try {
 
 const k8sApps = kc.makeApiClient(k8s.AppsV1Api);
 const k8sCore = kc.makeApiClient(k8s.CoreV1Api);
+const k8sNetworking = kc.makeApiClient(k8s.NetworkingV1Api);
 
 const NAMESPACE = process.env.K8S_NAMESPACE || "weblaunch";
 
@@ -65,7 +66,7 @@ async function deployToK8s(deployment, imageName, onLog) {
         spec: {
           containers: [{
             name,
-            image: imageName,
+            image: imageName.replace("localhost:5000", "registry:5000"),
             ports: [{ containerPort: port }],
             env: Object.entries(deployment.envVars || {}).map(([k, v]) => ({ name: k, value: v })),
             resources: {
@@ -103,8 +104,50 @@ async function deployToK8s(deployment, imageName, onLog) {
     await k8sCore.createNamespacedService(NAMESPACE, service);
   }
   onLog(`🌐 Service created: ${name}`);
+  
+  // Create Ingress
+  const hostname = `${name}.localhost`;
+  const ingress = {
+    apiVersion: "networking.k8s.io/v1",
+    kind: "Ingress",
+    metadata: { 
+      name, 
+      namespace: NAMESPACE, 
+      labels: { app: name },
+      annotations: {
+        "traefik.ingress.kubernetes.io/router.entrypoints": "web"
+      }
+    },
+    spec: {
+      ingressClassName: "traefik",
+      rules: [{
+        host: hostname,
+        http: {
+          paths: [{
+            path: "/",
+            pathType: "Prefix",
+            backend: {
+              service: {
+                name,
+                port: { number: 80 }
+              }
+            }
+          }]
+        }
+      }]
+    }
+  };
 
-  return { k8sName: name, namespace: NAMESPACE, servicePort: 80 };
+  try {
+    await k8sNetworking.readNamespacedIngress(name, NAMESPACE);
+    await k8sNetworking.replaceNamespacedIngress(name, NAMESPACE, ingress);
+    onLog(`🛤️  Updated Ingress: ${hostname}`);
+  } catch {
+    await k8sNetworking.createNamespacedIngress(NAMESPACE, ingress);
+    onLog(`🛤️  Created Ingress: ${hostname}`);
+  }
+
+  return { k8sName: name, namespace: NAMESPACE, servicePort: 80, hostname };
 }
 
 async function getPodStatus(name) {

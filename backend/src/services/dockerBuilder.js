@@ -138,7 +138,10 @@ async function buildImage(deployment, onLog) {
       onLog("📄 Using repository's own Dockerfile");
     }
 
-    const imageName = `weblaunch/${deployment.name}:${id.slice(0, 8)}`;
+    const registryPrefix = "localhost:5000";
+    const baseName = `${deployment.name}:${id.slice(0, 8)}`;
+    const imageName = `${registryPrefix}/${baseName}`;
+    
     onLog(`🐳 Building Docker image: ${imageName}`);
 
     await new Promise((resolve, reject) => {
@@ -155,7 +158,19 @@ async function buildImage(deployment, onLog) {
       });
     });
 
-    onLog(`✅ Docker image built: ${imageName}`);
+    onLog(`📤 Pushing image to local registry...`);
+    const image = docker.getImage(imageName);
+    await new Promise((resolve, reject) => {
+      image.push({}, (err, stream) => {
+        if (err) return reject(err);
+        docker.modem.followProgress(stream, (pushErr, output) => {
+          if (pushErr) return reject(pushErr);
+          resolve(output);
+        });
+      });
+    });
+
+    onLog(`✅ Docker image built and pushed: ${imageName}`);
     return imageName;
   } finally {
     await fs.remove(tmpDir).catch(() => {});

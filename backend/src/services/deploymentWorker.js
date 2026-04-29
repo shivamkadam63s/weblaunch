@@ -34,8 +34,8 @@ async function initDeploymentWorker(io) {
         emit("warn", `⚠️  K8s deploy skipped (${k8sErr.message}). Image built successfully.`);
       }
 
-      const url = k8sResult.k8sName
-        ? `http://${k8sResult.k8sName}.${k8sResult.namespace}.svc.cluster.local`
+      const url = k8sResult.hostname
+        ? `http://${k8sResult.hostname}:8081`
         : `LOCAL_DOCKER_IMAGE:${imageName}`;
 
       await updateDeployment(id, {
