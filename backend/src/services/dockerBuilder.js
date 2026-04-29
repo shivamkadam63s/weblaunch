@@ -123,7 +123,7 @@ CMD ["serve", "-l", "${p}", "."]
  * Clone repo, write Dockerfile, build image, return imageName.
  */
 async function buildImage(deployment, onLog) {
-  const { id, repoUrl, branch, stack, framework, buildCmd, startCmd, port, hasDockerfile } = deployment;
+  const { id, repoUrl, branch, stack, framework, buildCmd, startCmd, port, rootDir, isFullStack, hasDockerfile } = deployment;
   const tmpDir = path.join(os.tmpdir(), `weblaunch-build-${id}`);
 
   try {
@@ -133,23 +133,52 @@ async function buildImage(deployment, onLog) {
     if (branch) cloneOptions.push("--branch", branch);
     await git.clone(repoUrl, tmpDir, cloneOptions);
 
-    // Write generated Dockerfile if user has none
-    if (!hasDockerfile) {
-      onLog(`🔧 Generating Dockerfile for ${stack}/${framework}`);
-      const dockerfile = generateDockerfile(stack, framework, buildCmd, startCmd, port || 3000);
-      await fs.writeFile(path.join(tmpDir, "Dockerfile"), dockerfile);
-    } else {
-      onLog("📄 Using repository's own Dockerfile");
+    // Smart Patch: If this is the WebLaunch repo or similar, fix the Nginx config to prevent crashes
+    const nginxPath = path.join(tmpDir, rootDir || "", "nginx.conf");
+    if (await fs.pathExists(nginxPath)) {
+      onLog("🩹 Applying smart patch to nginx.conf for sidecar communication...");
+      let content = await fs.readFile(nginxPath, "utf8");
+      // Use direct localhost connection without resolver to avoid 502s
+      // This handles both the /api/ and /socket.io/ proxy_pass lines
+      content = content.replace(/proxy_pass http:\/\/backend:4000/g, "proxy_pass http://localhost:4000");
+      await fs.writeFile(nginxPath, content);
     }
+
+    // Determine if we should use an existing Dockerfile or generate one
+    let effectiveDockerfile = null;
+    const rootDirFull = path.join(tmpDir, rootDir || "");
+    const rootDockerfile = path.join(tmpDir, "Dockerfile");
+    const subDockerfile = rootDir ? path.join(rootDirFull, "Dockerfile") : null;
+
+    if (subDockerfile && await fs.pathExists(subDockerfile)) {
+      effectiveDockerfile = subDockerfile;
+      onLog(`📄 Using Dockerfile found in /${rootDir}`);
+    } else if (await fs.pathExists(rootDockerfile)) {
+      effectiveDockerfile = rootDockerfile;
+      onLog("📄 Using root Dockerfile");
+    }
+
+    if (!effectiveDockerfile) {
+      onLog(`🔧 Generating Dockerfile for ${stack}/${framework}${rootDir ? ` (in /${rootDir})` : ""}`);
+      const dockerfileContent = generateDockerfile(stack, framework, buildCmd, startCmd, port || 3000);
+      effectiveDockerfile = path.join(rootDirFull, "Dockerfile");
+      await fs.ensureDir(rootDirFull);
+      await fs.writeFile(effectiveDockerfile, dockerfileContent);
+    }
+
+    // If we are using a Dockerfile inside a subfolder, we should use that folder as the build context
+    // UNLESS it's the root Dockerfile, in which case we use tmpDir.
+    const buildContext = (effectiveDockerfile === subDockerfile) ? rootDirFull : tmpDir;
+    const dockerfilePath = path.relative(buildContext, effectiveDockerfile);
 
     const registryPrefix = "localhost:5000";
     const baseName = `${deployment.name}:${id.slice(0, 8)}`;
     const imageName = `${registryPrefix}/${baseName}`;
     
-    onLog(`🐳 Building Docker image: ${imageName}`);
+    onLog(`🐳 Building Frontend image: ${imageName}`);
 
     await new Promise((resolve, reject) => {
-      docker.buildImage({ context: tmpDir, src: ["."] }, { t: imageName }, (err, stream) => {
+      docker.buildImage({ context: buildContext, src: ["."] }, { t: imageName, dockerfile: dockerfilePath, nocache: true }, (err, stream) => {
         if (err) return reject(err);
         docker.modem.followProgress(stream, (buildErr, output) => {
           if (buildErr) return reject(buildErr);
@@ -161,6 +190,38 @@ async function buildImage(deployment, onLog) {
         });
       });
     });
+
+    if (isFullStack) {
+      const backendImageName = `${imageName}-backend`;
+      const backendDir = path.join(tmpDir, "backend");
+      onLog(`🐳 Building Backend image: ${backendImageName}`);
+
+      // Generate a simple Node.js Dockerfile for the backend if missing
+      const backendDockerfile = path.join(backendDir, "Dockerfile");
+      if (!await fs.pathExists(backendDockerfile)) {
+        onLog("🔧 Generating default Dockerfile for backend sidecar");
+        const content = `FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nEXPOSE 4000\nCMD ["npm", "start"]`;
+        await fs.writeFile(backendDockerfile, content);
+      }
+
+      await new Promise((resolve, reject) => {
+        docker.buildImage({ context: backendDir, src: ["."] }, { t: backendImageName, nocache: true }, (err, stream) => {
+          if (err) return reject(err);
+          docker.modem.followProgress(stream, (buildErr, output) => {
+            if (buildErr) return reject(buildErr);
+            const errors = (output || []).filter(o => o.error).map(o => o.error);
+            if (errors.length) return reject(new Error(errors.join("\n")));
+            resolve(output);
+          }, (event) => {
+            if (event.stream) onLog(`[backend] ${event.stream.trim()}`);
+          });
+        });
+      });
+      
+      onLog(`📤 Pushing backend image to local registry...`);
+      const backendImage = docker.getImage(backendImageName);
+      await backendImage.push();
+    }
 
     onLog(`📤 Pushing image to local registry...`);
     const image = docker.getImage(imageName);

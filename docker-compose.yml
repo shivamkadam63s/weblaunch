@@ -65,6 +65,7 @@ services:
     volumes:
       - k3s-data:/var/lib/rancher/k3s
       - k3s-config:/output
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "6443:6443"
       - "8081:80"
