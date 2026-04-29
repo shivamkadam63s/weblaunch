@@ -50,8 +50,33 @@ async function analyzeRepository(repoUrl, branch) {
 
     // Refine start command for Node.js
     if (detected.stack === "nodejs" && pkg) {
-      if (pkg.scripts?.start) {
+      const startScript = pkg.scripts?.start || "";
+      const buildScript = pkg.scripts?.build || "";
+
+      // If `npm start` chains a build (e.g. "npm run build && node scripts/start.js")
+      // split into separate buildCmd + startCmd so the Dockerfile can multi-stage
+      if (startScript && startScript.includes("&&")) {
+        const parts = startScript.split("&&").map(s => s.trim());
+        // Everything except the last part is a build step
+        const buildParts = parts.slice(0, -1);
+        const runPart = parts[parts.length - 1];
+
+        // Normalise: "npm run build" → "npm run build", "node scripts/start.js" kept as-is
+        detected.buildCmd = buildParts.join(" && ");
+        detected.startCmd = runPart;
+      } else if (startScript) {
+        // `npm start` is a single command — keep as-is, no separate buildCmd needed
         detected.startCmd = "npm start";
+        // But if there's a separate build script that build tools need, flag it
+        if (!detected.buildCmd && buildScript && (
+          buildScript.includes("webpack") ||
+          buildScript.includes("vite") ||
+          buildScript.includes("rollup") ||
+          buildScript.includes("parcel") ||
+          buildScript.includes("gulp")
+        )) {
+          detected.buildCmd = "npm run build";
+        }
       } else if (pkg.main && (await fs.pathExists(path.join(tmpDir, pkg.main)))) {
         detected.startCmd = `node ${pkg.main}`;
       } else {

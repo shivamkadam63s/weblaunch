@@ -14,20 +14,22 @@ const docker = new Docker({ socketPath: process.env.DOCKER_SOCKET || "/var/run/d
 function generateDockerfile(stack, framework, buildCmd, startCmd, port) {
   const templates = {
     nodejs: (bc, sc, p) => `
-FROM node:20-alpine AS base
+FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
-${bc ? `FROM base AS builder
+${bc ? `FROM deps AS builder
 COPY . .
 RUN ${bc}
 
 FROM node:20-alpine AS runner
 WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app ./` : `COPY . .`}
+COPY --from=builder /app ./` : `FROM deps AS runner
+WORKDIR /app
+COPY . .`}
 
 EXPOSE ${p}
 ENV PORT=${p}
