@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weblaunch-backend
+  namespace: weblaunch
+  labels:
+    app: weblaunch-backend
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: weblaunch-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: weblaunch-backend
+        component: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "4000"
+        prometheus.io/path:   "/metrics"
+    spec:
+      serviceAccountName: weblaunch-backend
+      containers:
+        - name: backend
+          image: weblaunch/backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: K8S_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          envFrom:
+            - secretRef:
+                name: weblaunch-secrets
+                optional: true
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+      volumes:
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: weblaunch-backend
+  namespace: weblaunch
+spec:
+  selector:
+    app: weblaunch-backend
+  ports:
+    - port: 4000
+      targetPort: 4000
+      name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: weblaunch-backend
+  namespace: weblaunch

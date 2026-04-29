@@ -1,0 +1,193 @@
+version: "3.9"
+
+# ============================================================
+#  WebLaunch - Automated Website Deployment Platform
+#  Single docker-compose.yml for the full stack
+# ============================================================
+
+x-common-labels: &labels
+  com.weblaunch.project: "weblaunch"
+
+networks:
+  weblaunch-net:
+    driver: bridge
+  monitoring-net:
+    driver: bridge
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+services:
+
+  # ── Frontend (React + Vite → Nginx) ───────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: weblaunch-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3002}:80"
+    environment:
+      - VITE_API_URL=http://backend:4000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - weblaunch-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "frontend"
+
+  # ── Backend (Node.js / Express) ────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: weblaunch-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=${NODE_ENV:-production}
+      - FRONTEND_URL=http://localhost:${FRONTEND_PORT:-3000}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - DOCKER_SOCKET=/var/run/docker.sock
+      - K8S_NAMESPACE=${K8S_NAMESPACE:-weblaunch}
+      - API_KEY=${API_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./backend/logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:4000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - weblaunch-net
+      - monitoring-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "backend"
+
+  # ── Redis (Job Queue + Store) ──────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: weblaunch-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --appendfsync everysec
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - weblaunch-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "redis"
+
+  # ── Prometheus ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: weblaunch-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    networks:
+      - monitoring-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "prometheus"
+
+  # ── Grafana ────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: weblaunch-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=localhost
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "grafana"
+
+  # ── Node Exporter (host metrics) ───────────────────────────
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: weblaunch-node-exporter
+    restart: unless-stopped
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "node-exporter"
+
+  # ── cAdvisor (container metrics) ──────────────────────────
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: weblaunch-cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - monitoring-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "cadvisor"

@@ -1,0 +1,19 @@
+---
+# Global variables for all hosts
+app_name: weblaunch
+app_version: latest
+docker_compose_version: "2.23.0"
+k8s_version: "1.28"
+node_exporter_version: "1.7.0"
+prometheus_version: "2.48.0"
+grafana_version: "10.2.2"
+
+# Application settings
+app_port_backend:  4000
+app_port_frontend: 3000
+grafana_port:      3001
+prometheus_port:   9090
+redis_port:        6379
+
+# Docker registry (set via env or vault)
+ecr_registry: ""

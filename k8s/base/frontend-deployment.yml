@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weblaunch-frontend
+  namespace: weblaunch
+  labels:
+    app: weblaunch-frontend
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: weblaunch-frontend
+  template:
+    metadata:
+      labels:
+        app: weblaunch-frontend
+        component: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: weblaunch/frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: weblaunch-frontend
+  namespace: weblaunch
+spec:
+  selector:
+    app: weblaunch-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

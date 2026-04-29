@@ -1,0 +1,31 @@
+---
+# WebLaunch - Main Playbook
+# Runs all roles in correct order
+
+- name: Configure WebLaunch Application Servers
+  hosts: weblaunch_servers
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../inventory/group_vars/all.yml
+  roles:
+    - role: common
+      tags: [common, always]
+    - role: docker
+      tags: [docker]
+    - role: kubernetes
+      tags: [kubernetes]
+
+- name: Configure Monitoring
+  hosts: monitoring_servers
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../inventory/group_vars/all.yml
+  roles:
+    - role: common
+      tags: [common, always]
+    - role: docker
+      tags: [docker]
+    - role: monitoring
+      tags: [monitoring]

@@ -1,0 +1,44 @@
+groups:
+  - name: weblaunch_alerts
+    interval: 30s
+    rules:
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 85% for more than 5 minutes."
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 90%."
+
+      # Backend down
+      - alert: BackendDown
+        expr: up{job="weblaunch-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WebLaunch backend is down"
+          description: "The backend API has been unreachable for more than 1 minute."
+
+      # High HTTP error rate
+      - alert: HighErrorRate
+        expr: rate(weblaunch_http_requests_total{status_code=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "Error rate is above 10% for 5xx responses."
