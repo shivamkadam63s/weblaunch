@@ -43,6 +43,29 @@ async function ensureNamespace() {
     await k8sCore.createNamespace({ metadata: { name: NAMESPACE } });
     logger.info(`Created namespace: ${NAMESPACE}`);
   }
+
+  // Ensure the default service account has cluster-admin privileges
+  // so the backend can manage K8s resources when running inside the cluster.
+  const rbacApi = kc.makeApiClient(k8s.RbacAuthorizationV1Api);
+  const bindingName = `weblaunch-admin-binding-${NAMESPACE}`;
+  const binding = {
+    apiVersion: "rbac.authorization.k8s.io/v1",
+    kind: "ClusterRoleBinding",
+    metadata: { name: bindingName },
+    subjects: [{ kind: "ServiceAccount", name: "default", namespace: NAMESPACE }],
+    roleRef: { kind: "ClusterRole", name: "cluster-admin", apiGroup: "rbac.authorization.k8s.io" }
+  };
+
+  try {
+    await rbacApi.readClusterRoleBinding(bindingName);
+  } catch {
+    try {
+      await rbacApi.createClusterRoleBinding(binding);
+      logger.info(`Created ClusterRoleBinding: ${bindingName}`);
+    } catch (err) {
+      logger.warn(`Failed to create ClusterRoleBinding: ${err.message}`);
+    }
+  }
 }
 
 async function deployToK8s(deployment, imageName, onLog) {
