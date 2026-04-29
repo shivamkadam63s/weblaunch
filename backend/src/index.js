@@ -12,6 +12,7 @@ const logger = require("./utils/logger");
 const deployRoutes = require("./routes/deploy");
 const statusRoutes = require("./routes/status");
 const logsRoutes = require("./routes/logs");
+const { router: metricsRouter } = require("./routes/metrics");
 const { initRedis } = require("./services/redisClient");
 const { initDeploymentWorker } = require("./services/deploymentWorker");
 const { errorHandler } = require("./middleware/errorHandler");
@@ -31,8 +32,10 @@ const io = new Server(server, {
 // Attach io to app for use in routes
 app.set("io", io);
 
-// Prometheus default metrics
-collectDefaultMetrics({ prefix: "weblaunch_" });
+// Prometheus metrics (prefixed with weblaunch_)
+// (collectDefaultMetrics is already called in routes/metrics.js or we can call it here)
+// Actually we call it here to ensure it's on the global registry with prefix
+require("prom-client").collectDefaultMetrics({ prefix: "weblaunch_" });
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(helmet());
@@ -63,16 +66,7 @@ app.get("/health", (req, res) =>
 app.use("/api/deployments", deployRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/logs", logsRoutes);
-// Metrics endpoint with proper middleware tracking
-app.get("/metrics", async (req, res) => {
-  try {
-    res.set("Content-Type", register.contentType);
-    res.end(await register.metrics());
-  } catch (err) {
-    logger.error("Metrics error:", err);
-    res.status(500).end(err.message);
-  }
-});
+app.use("/metrics", metricsRouter);
 
 // 404 handler
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));

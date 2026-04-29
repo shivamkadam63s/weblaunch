@@ -1,8 +1,8 @@
 {
   "title": "🖥️ Server Overview",
-  "uid": "weblaunch-overview-v5",
+  "uid": "weblaunch-overview-v6",
   "description": "Premium visibility with human-readable website names for all deployments.",
-  "version": 5,
+  "version": 6,
   "schemaVersion": 38,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
@@ -116,7 +116,7 @@
       "type": "row",
       "title": "⚙️ Platform Infrastructure",
       "gridPos": { "x": 0, "y": 15, "w": 24, "h": 1 },
-      "collapsed": true
+      "collapsed": false
     },
     {
       "id": 31,
@@ -127,7 +127,20 @@
         "expr": "sum by (id) (rate(container_cpu_usage_seconds_total{id=~\"/docker/.*\", id!~\".*kubepods.*\"}[2m])) * 100",
         "legendFormat": "{{id}}"
       }],
-      "fieldConfig": { "defaults": { "unit": "percent" } }
+      "fieldConfig": { "defaults": { "unit": "percent" } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Infrastructure RAM",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "container_memory_usage_bytes{id=~\"/docker/.*\", id!~\".*kubepods.*\"} / 1024 / 1024",
+        "legendFormat": "{{id}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "megabytes" } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
     }
   ]
 }
