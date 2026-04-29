@@ -1,8 +1,8 @@
 {
   "title": "📦 Per-Deployment Resources",
-  "uid": "weblaunch-per-deployment",
+  "uid": "weblaunch-deployments-v3",
   "description": "Resource usage for a single deployed application. Use the dropdown to select a deployment.",
-  "version": 1,
+  "version": 2,
   "schemaVersion": 38,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
@@ -11,13 +11,13 @@
   "templating": {
     "list": [
       {
-        "name": "deployment",
-        "label": "Deployment",
-        "description": "Select a deployed application container",
+        "name": "deployment_id",
+        "label": "Deployment ID",
+        "description": "Select a deployed application container ID",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
         "query": {
-          "query": "label_values(container_cpu_usage_seconds_total{name!=\"\", name!~\".*POD.*|.*pause.*|.*k3s.*|.*registry.*|.*redis.*|.*prometheus.*|.*grafana.*|.*cadvisor.*|.*node-exporter.*|.*weblaunch-backend.*|.*weblaunch-frontend.*\"}, name)",
+          "query": "label_values(container_cpu_usage_seconds_total{id=~\"/docker/.*\"}, id)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -36,22 +36,20 @@
     ]
   },
   "panels": [
-
     {
       "id": 1,
       "type": "row",
-      "title": "📊 $deployment — Summary",
+      "title": "📊 $deployment_id — Summary",
       "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
       "collapsed": false
     },
-
     {
       "id": 2,
       "type": "gauge",
       "title": "CPU Usage",
       "gridPos": { "x": 0, "y": 1, "w": 5, "h": 5 },
       "targets": [{
-        "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"$deployment.*\"}[2m])) * 100",
+        "expr": "sum(rate(container_cpu_usage_seconds_total{id=\"$deployment_id\"}[2m])) * 100",
         "legendFormat": "CPU %",
         "refId": "A"
       }],
@@ -76,14 +74,13 @@
         }
       }
     },
-
     {
       "id": 3,
       "type": "gauge",
       "title": "RAM Usage",
       "gridPos": { "x": 5, "y": 1, "w": 5, "h": 5 },
       "targets": [{
-        "expr": "sum(container_memory_usage_bytes{name=~\"$deployment.*\"}) / 1024 / 1024",
+        "expr": "sum(container_memory_usage_bytes{id=\"$deployment_id\"}) / 1024 / 1024",
         "legendFormat": "RAM MB",
         "refId": "A"
       }],
@@ -108,14 +105,13 @@
         }
       }
     },
-
     {
       "id": 4,
       "type": "stat",
       "title": "Network In",
       "gridPos": { "x": 10, "y": 1, "w": 4, "h": 5 },
       "targets": [{
-        "expr": "sum(rate(container_network_receive_bytes_total{name=~\"$deployment.*\"}[2m]))",
+        "expr": "sum(rate(container_network_receive_bytes_total{id=\"$deployment_id\"}[2m]))",
         "legendFormat": "Rx",
         "refId": "A"
       }],
@@ -135,14 +131,13 @@
         }
       }
     },
-
     {
       "id": 5,
       "type": "stat",
       "title": "Network Out",
       "gridPos": { "x": 14, "y": 1, "w": 4, "h": 5 },
       "targets": [{
-        "expr": "sum(rate(container_network_transmit_bytes_total{name=~\"$deployment.*\"}[2m]))",
+        "expr": "sum(rate(container_network_transmit_bytes_total{id=\"$deployment_id\"}[2m]))",
         "legendFormat": "Tx",
         "refId": "A"
       }],
@@ -162,14 +157,13 @@
         }
       }
     },
-
     {
       "id": 6,
       "type": "stat",
       "title": "Container Restarts",
       "gridPos": { "x": 18, "y": 1, "w": 3, "h": 5 },
       "targets": [{
-        "expr": "sum(container_restart_count{name=~\"$deployment.*\"})",
+        "expr": "sum(container_restart_count{id=\"$deployment_id\"})",
         "legendFormat": "Restarts",
         "refId": "A"
       }],
@@ -192,14 +186,13 @@
         }
       }
     },
-
     {
       "id": 7,
       "type": "stat",
       "title": "Container Up Since",
       "gridPos": { "x": 21, "y": 1, "w": 3, "h": 5 },
       "targets": [{
-        "expr": "time() - container_start_time_seconds{name=~\"$deployment.*\"}",
+        "expr": "time() - container_start_time_seconds{id=\"$deployment_id\"}",
         "legendFormat": "Uptime",
         "refId": "A"
       }],
@@ -218,7 +211,6 @@
         }
       }
     },
-
     {
       "id": 10,
       "type": "row",
@@ -226,14 +218,13 @@
       "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
       "collapsed": false
     },
-
     {
       "id": 11,
       "type": "timeseries",
       "title": "CPU Usage Over Time",
       "gridPos": { "x": 0, "y": 7, "w": 12, "h": 8 },
       "targets": [{
-        "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"$deployment.*\"}[2m])) * 100",
+        "expr": "sum(rate(container_cpu_usage_seconds_total{id=\"$deployment_id\"}[2m])) * 100",
         "legendFormat": "CPU %",
         "refId": "A"
       }],
@@ -247,7 +238,6 @@
       },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
     },
-
     {
       "id": 12,
       "type": "timeseries",
@@ -255,12 +245,12 @@
       "gridPos": { "x": 12, "y": 7, "w": 12, "h": 8 },
       "targets": [
         {
-          "expr": "sum(container_memory_usage_bytes{name=~\"$deployment.*\"}) / 1024 / 1024",
+          "expr": "sum(container_memory_usage_bytes{id=\"$deployment_id\"}) / 1024 / 1024",
           "legendFormat": "RSS Used MB",
           "refId": "A"
         },
         {
-          "expr": "sum(container_memory_cache{name=~\"$deployment.*\"}) / 1024 / 1024",
+          "expr": "sum(container_memory_cache{id=\"$deployment_id\"}) / 1024 / 1024",
           "legendFormat": "Cache MB",
           "refId": "B"
         }
@@ -272,7 +262,6 @@
         }
       }
     },
-
     {
       "id": 13,
       "type": "timeseries",
@@ -280,12 +269,12 @@
       "gridPos": { "x": 0, "y": 15, "w": 12, "h": 7 },
       "targets": [
         {
-          "expr": "sum(rate(container_network_receive_bytes_total{name=~\"$deployment.*\"}[2m]))",
+          "expr": "sum(rate(container_network_receive_bytes_total{id=\"$deployment_id\"}[2m]))",
           "legendFormat": "↓ Receive",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(container_network_transmit_bytes_total{name=~\"$deployment.*\"}[2m]))",
+          "expr": "sum(rate(container_network_transmit_bytes_total{id=\"$deployment_id\"}[2m]))",
           "legendFormat": "↑ Transmit",
           "refId": "B"
         }
@@ -297,7 +286,6 @@
         }
       }
     },
-
     {
       "id": 14,
       "type": "timeseries",
@@ -305,12 +293,12 @@
       "gridPos": { "x": 12, "y": 15, "w": 12, "h": 7 },
       "targets": [
         {
-          "expr": "sum(rate(container_fs_reads_bytes_total{name=~\"$deployment.*\"}[2m]))",
+          "expr": "sum(rate(container_fs_reads_bytes_total{id=\"$deployment_id\"}[2m]))",
           "legendFormat": "Read",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(container_fs_writes_bytes_total{name=~\"$deployment.*\"}[2m]))",
+          "expr": "sum(rate(container_fs_writes_bytes_total{id=\"$deployment_id\"}[2m]))",
           "legendFormat": "Write",
           "refId": "B"
         }

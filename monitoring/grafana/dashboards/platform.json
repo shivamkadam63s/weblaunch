@@ -1,15 +1,14 @@
 {
   "title": "🚀 WebLaunch Platform",
-  "uid": "weblaunch-platform",
+  "uid": "weblaunch-platform-v3",
   "description": "WebLaunch platform health — deployment counts, queue, API performance and error rates",
-  "version": 1,
+  "version": 2,
   "schemaVersion": 38,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
   "timezone": "browser",
   "tags": ["weblaunch", "platform"],
   "panels": [
-
     {
       "id": 1,
       "type": "row",
@@ -17,7 +16,6 @@
       "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
       "collapsed": false
     },
-
     {
       "id": 2,
       "type": "stat",
@@ -44,7 +42,6 @@
         }
       }
     },
-
     {
       "id": 3,
       "type": "stat",
@@ -75,7 +72,6 @@
         }
       }
     },
-
     {
       "id": 4,
       "type": "stat",
@@ -105,7 +101,6 @@
         }
       }
     },
-
     {
       "id": 5,
       "type": "stat",
@@ -132,7 +127,6 @@
         }
       }
     },
-
     {
       "id": 6,
       "type": "stat",
@@ -163,7 +157,6 @@
         }
       }
     },
-
     {
       "id": 7,
       "type": "stat",
@@ -189,7 +182,6 @@
         }
       }
     },
-
     {
       "id": 10,
       "type": "row",
@@ -197,7 +189,6 @@
       "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
       "collapsed": false
     },
-
     {
       "id": 11,
       "type": "timeseries",
@@ -216,7 +207,6 @@
         }
       }
     },
-
     {
       "id": 12,
       "type": "timeseries",
@@ -235,7 +225,6 @@
         }
       }
     },
-
     {
       "id": 13,
       "type": "timeseries",
@@ -254,7 +243,6 @@
         }
       }
     },
-
     {
       "id": 20,
       "type": "row",
@@ -262,7 +250,6 @@
       "gridPos": { "x": 0, "y": 13, "w": 24, "h": 1 },
       "collapsed": false
     },
-
     {
       "id": 21,
       "type": "timeseries",
@@ -281,7 +268,6 @@
       },
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] } }
     },
-
     {
       "id": 22,
       "type": "timeseries",
@@ -316,7 +302,6 @@
       },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
     },
-
     {
       "id": 23,
       "type": "timeseries",
@@ -334,7 +319,6 @@
         }
       }
     },
-
     {
       "id": 24,
       "type": "timeseries",
@@ -359,7 +343,6 @@
         }
       }
     },
-
     {
       "id": 30,
       "type": "row",
@@ -367,7 +350,6 @@
       "gridPos": { "x": 0, "y": 29, "w": 24, "h": 1 },
       "collapsed": false
     },
-
     {
       "id": 31,
       "type": "timeseries",
@@ -392,7 +374,6 @@
         }
       }
     },
-
     {
       "id": 32,
       "type": "timeseries",

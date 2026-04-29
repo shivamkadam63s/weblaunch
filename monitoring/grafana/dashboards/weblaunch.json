@@ -1,15 +1,14 @@
 {
   "title": "🖥️ Server Overview",
-  "uid": "weblaunch-server-overview",
+  "uid": "weblaunch-overview-fixed-v3",
   "description": "Combined host + container resource load for the WebLaunch server",
-  "version": 1,
+  "version": 3,
   "schemaVersion": 38,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
   "timezone": "browser",
   "tags": ["weblaunch", "server"],
   "panels": [
-
     {
       "id": 1,
       "type": "row",
@@ -17,12 +16,10 @@
       "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
       "collapsed": false
     },
-
     {
       "id": 2,
       "type": "gauge",
       "title": "CPU Usage",
-      "description": "Total host CPU utilisation across all cores",
       "gridPos": { "x": 0, "y": 1, "w": 4, "h": 5 },
       "targets": [{
         "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)",
@@ -30,10 +27,7 @@
         "refId": "A"
       }],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "reduceOptions": { "calcs": ["lastNotNull"] }
       },
       "fieldConfig": {
         "defaults": {
@@ -52,12 +46,10 @@
         }
       }
     },
-
     {
       "id": 3,
       "type": "gauge",
       "title": "RAM Usage",
-      "description": "Host memory utilisation",
       "gridPos": { "x": 4, "y": 1, "w": 4, "h": 5 },
       "targets": [{
         "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
@@ -65,8 +57,7 @@
         "refId": "A"
       }],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "orientation": "auto"
+        "reduceOptions": { "calcs": ["lastNotNull"] }
       },
       "fieldConfig": {
         "defaults": {
@@ -85,7 +76,6 @@
         }
       }
     },
-
     {
       "id": 4,
       "type": "stat",
@@ -120,14 +110,14 @@
         }
       }
     },
-
     {
       "id": 5,
       "type": "stat",
       "title": "Disk Usage",
+      "description": "Main disk usage percentage (auto-detected)",
       "gridPos": { "x": 12, "y": 1, "w": 4, "h": 5 },
       "targets": [{
-        "expr": "(node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"} - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"}) / node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"} * 100",
+        "expr": "max((node_filesystem_size_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"} - node_filesystem_avail_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"}) / node_filesystem_size_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"}) * 100",
         "legendFormat": "Disk %",
         "refId": "A"
       }],
@@ -151,14 +141,13 @@
         }
       }
     },
-
     {
       "id": 6,
       "type": "stat",
       "title": "Running Containers",
       "gridPos": { "x": 16, "y": 1, "w": 4, "h": 5 },
       "targets": [{
-        "expr": "count(container_last_seen{name!=\"\", name!~\".*POD.*\"})",
+        "expr": "count(container_last_seen{id=~\"/docker/.*\", id!~\".*kubepods.*\"})",
         "legendFormat": "Containers",
         "refId": "A"
       }],
@@ -177,7 +166,6 @@
         }
       }
     },
-
     {
       "id": 7,
       "type": "stat",
@@ -212,7 +200,6 @@
         }
       }
     },
-
     {
       "id": 10,
       "type": "timeseries",
@@ -229,16 +216,10 @@
           "min": 0,
           "max": 100,
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "fillOpacity": 15,
-            "lineWidth": 2,
-            "spanNulls": true
-          }
+          "custom": { "fillOpacity": 15, "lineWidth": 2, "spanNulls": true }
         }
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+      }
     },
-
     {
       "id": 11,
       "type": "timeseries",
@@ -247,85 +228,22 @@
       "targets": [
         {
           "expr": "node_memory_MemTotal_bytes / 1024 / 1024 / 1024",
-          "legendFormat": "Total",
+          "legendFormat": "Total GB",
           "refId": "A"
         },
         {
           "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024 / 1024",
-          "legendFormat": "Used",
+          "legendFormat": "Used GB",
           "refId": "B"
-        },
-        {
-          "expr": "node_memory_MemAvailable_bytes / 1024 / 1024 / 1024",
-          "legendFormat": "Available",
-          "refId": "C"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 2,
-          "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
-        },
-        "overrides": [
-          { "matcher": { "id": "byName", "options": "Total" },   "properties": [{ "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "Used" },    "properties": [{ "id": "color", "value": { "fixedColor": "#E02F44", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "Available" },"properties": [{ "id": "color", "value": { "fixedColor": "#37872D", "mode": "fixed" } }] }
-        ]
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
-    },
-
-    {
-      "id": 12,
-      "type": "timeseries",
-      "title": "Network I/O (host)",
-      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 7 },
-      "targets": [
-        {
-          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[2m])",
-          "legendFormat": "↓ Inbound  {{device}}",
-          "refId": "A"
-        },
-        {
-          "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[2m])",
-          "legendFormat": "↑ Outbound {{device}}",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps",
           "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
         }
       }
     },
-
-    {
-      "id": 13,
-      "type": "timeseries",
-      "title": "Disk I/O",
-      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 7 },
-      "targets": [
-        {
-          "expr": "rate(node_disk_read_bytes_total[2m])",
-          "legendFormat": "Read  {{device}}",
-          "refId": "A"
-        },
-        {
-          "expr": "rate(node_disk_written_bytes_total[2m])",
-          "legendFormat": "Write {{device}}",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps",
-          "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
-        }
-      }
-    },
-
     {
       "id": 20,
       "type": "row",
@@ -333,16 +251,14 @@
       "gridPos": { "x": 0, "y": 21, "w": 24, "h": 1 },
       "collapsed": false
     },
-
     {
       "id": 21,
       "type": "timeseries",
       "title": "Container CPU — All",
-      "description": "CPU usage per container (WebLaunch + deployed apps)",
       "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
       "targets": [{
-        "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name!=\"\", name!~\".*POD.*\"}[2m])) * 100",
-        "legendFormat": "{{name}}",
+        "expr": "sum by (id) (rate(container_cpu_usage_seconds_total{id=~\"/docker/.*\", id!~\".*kubepods.*\"}[2m])) * 100",
+        "legendFormat": "{{id}}",
         "refId": "A"
       }],
       "fieldConfig": {
@@ -351,18 +267,18 @@
           "custom": { "fillOpacity": 8, "lineWidth": 1.5, "spanNulls": true }
         }
       },
-      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] } }
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" }
+      }
     },
-
     {
       "id": 22,
       "type": "timeseries",
       "title": "Container RAM — All",
-      "description": "Memory usage per container",
       "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
       "targets": [{
-        "expr": "container_memory_usage_bytes{name!=\"\", name!~\".*POD.*\"} / 1024 / 1024",
-        "legendFormat": "{{name}}",
+        "expr": "container_memory_usage_bytes{id=~\"/docker/.*\", id!~\".*kubepods.*\"} / 1024 / 1024",
+        "legendFormat": "{{id}}",
         "refId": "A"
       }],
       "fieldConfig": {
@@ -371,7 +287,9 @@
           "custom": { "fillOpacity": 8, "lineWidth": 1.5, "spanNulls": true }
         }
       },
-      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] } }
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" }
+      }
     }
   ]
 }
