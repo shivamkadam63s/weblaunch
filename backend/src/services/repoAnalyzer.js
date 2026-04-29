@@ -13,6 +13,7 @@ const DETECTION_RULES = [
   { name:"Svelte",        stack:"nodejs",  framework:"svelte",     check:(f,p,r)=>p&&(p.dependencies?.svelte||p.devDependencies?.svelte),                                    buildCmd:"npm run build",                                              startCmd:"node build",                                  port:3000 },
   { name:"NestJS",        stack:"nodejs",  framework:"nestjs",     check:(f,p,r)=>p&&(p.dependencies?.["@nestjs/core"]||p.devDependencies?.["@nestjs/cli"]),                  buildCmd:"npm run build",                                              startCmd:"node dist/main",                              port:3000 },
   { name:"Express.js",    stack:"nodejs",  framework:"express",    check:(f,p,r)=>p&&p.dependencies?.express,                                                                 buildCmd:null,                                                         startCmd:"npm start",                                   port:3000 },
+  { name:"Vite",          stack:"nodejs",  framework:"vite",       check:(f,p,r)=>p&&(p.dependencies?.vite||p.devDependencies?.vite),                                         buildCmd:"npm run build",                                              startCmd:"npx serve -s dist -l 3000",                   port:80 },
   { name:"Node.js",       stack:"nodejs",  framework:"nodejs",     check:(f,p,r)=>p!==null||f.includes("package.json"),                                                       buildCmd:null,                                                         startCmd:"npm start",                                   port:3000 },
   { name:"Django",        stack:"python",  framework:"django",     check:(f,p,r)=>f.includes("manage.py"),                                                                    buildCmd:"pip install -r requirements.txt && python manage.py migrate", startCmd:"gunicorn wsgi:application --bind 0.0.0.0:8000",port:8000 },
   { name:"FastAPI",       stack:"python",  framework:"fastapi",    check:(f,p,r)=>r.includes("fastapi"),                                                                      buildCmd:"pip install -r requirements.txt",                             startCmd:"uvicorn main:app --host 0.0.0.0 --port 8000", port:8000 },
@@ -35,18 +36,46 @@ async function analyzeRepository(repoUrl, branch) {
     await git.clone(repoUrl, tmpDir, cloneOptions);
     const files = await getAllFiles(tmpDir);
     const relFiles = files.map(f => path.relative(tmpDir, f).replace(/\\/g, "/"));
+    
+    const hasBackend = await fs.pathExists(path.join(tmpDir, "backend"));
+    const hasFrontend = await fs.pathExists(path.join(tmpDir, "frontend"));
+    console.log(`🔍 Analysis for ${tmpDir}: hasBackend=${hasBackend}, hasFrontend=${hasFrontend}`);
+
     let pkg = null;
+    let rootPath = tmpDir;
+    
     const pkgPath = path.join(tmpDir, "package.json");
-    if (await fs.pathExists(pkgPath)) pkg = await fs.readJson(pkgPath).catch(() => null);
+    if (await fs.pathExists(pkgPath)) {
+      pkg = await fs.readJson(pkgPath).catch(() => null);
+    } else {
+      const subfolders = ["frontend", "app", "client"];
+      for (const folder of subfolders) {
+        const subPkgPath = path.join(tmpDir, folder, "package.json");
+        if (await fs.pathExists(subPkgPath)) {
+          pkg = await fs.readJson(subPkgPath).catch(() => null);
+          if (pkg) {
+            rootPath = path.join(tmpDir, folder);
+            break;
+          }
+        }
+      }
+    }
+
     let requirements = [];
-    const reqPath = path.join(tmpDir, "requirements.txt");
+    const reqPath = path.join(rootPath, "requirements.txt");
     if (await fs.pathExists(reqPath)) {
       const reqContent = await fs.readFile(reqPath, "utf8");
       requirements = reqContent.split("\n").map(l => l.trim().split(/[>=<!/]/)[0].toLowerCase()).filter(Boolean);
     }
+
     const hasDockerfile = await fs.pathExists(path.join(tmpDir, "Dockerfile"));
     const hasDockerCompose = await fs.pathExists(path.join(tmpDir, "docker-compose.yml")) || await fs.pathExists(path.join(tmpDir, "docker-compose.yaml"));
-    const detected = detectStack(relFiles, pkg, requirements);
+    
+    const rootRelFiles = files
+      .filter(f => f.startsWith(rootPath))
+      .map(f => path.relative(rootPath, f).replace(/\\/g, "/"));
+
+    const detected = detectStack(rootRelFiles, pkg, requirements);
 
     // Refine start command for Node.js
     if (detected.stack === "nodejs" && pkg) {
@@ -90,7 +119,7 @@ async function analyzeRepository(repoUrl, branch) {
       }
     }
 
-    return { ...detected, hasDockerfile, hasDockerCompose, files: relFiles.slice(0, 50), totalFiles: relFiles.length, packageJson: pkg ? { name: pkg.name, version: pkg.version, scripts: pkg.scripts } : null };
+    return { ...detected, rootDir: path.relative(tmpDir, rootPath).replace(/\\/g, "/"), isFullStack: (hasBackend && hasFrontend), hasDockerfile, hasDockerCompose, files: relFiles.slice(0, 50), totalFiles: relFiles.length, packageJson: pkg ? { name: pkg.name, version: pkg.version, scripts: pkg.scripts } : null };
   } finally {
     await fs.remove(tmpDir).catch(() => {});
   }

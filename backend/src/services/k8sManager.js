@@ -54,32 +54,81 @@ async function deployToK8s(deployment, imageName, onLog) {
 
   onLog(`☸️  Creating Kubernetes Deployment: ${name}`);
 
-  const k8sDeployment = {
-    apiVersion: "apps/v1",
-    kind: "Deployment",
-    metadata: { name, namespace: NAMESPACE, labels: { app: name, "managed-by": "weblaunch" } },
-    spec: {
-      replicas,
-      selector: { matchLabels: { app: name } },
-      template: {
-        metadata: { labels: { app: name } },
-        spec: {
-          containers: [{
-            name,
-            image: imageName.replace("localhost:5000", "registry:5000"),
-            ports: [{ containerPort: port }],
-            env: Object.entries(deployment.envVars || {}).map(([k, v]) => ({ name: k, value: v })),
-            resources: {
-              requests: { cpu: "100m", memory: "128Mi" },
-              limits:   { cpu: "500m", memory: "512Mi" },
-            },
-            livenessProbe:  { httpGet: { path: "/", port }, initialDelaySeconds: 30, periodSeconds: 10 },
-            readinessProbe: { httpGet: { path: "/", port }, initialDelaySeconds: 10, periodSeconds: 5  },
-          }],
+    const containers = [
+      {
+        name,
+        image: imageName.replace("localhost:5000", "registry:5000"),
+        ports: [{ containerPort: port }],
+        env: Object.entries(deployment.envVars || {}).map(([k, v]) => ({ name: k, value: v })),
+        resources: {
+          requests: { cpu: "100m", memory: "128Mi" },
+          limits: { cpu: "500m", memory: "512Mi" },
+        },
+        livenessProbe: { httpGet: { path: "/", port }, initialDelaySeconds: 30, periodSeconds: 10 },
+        readinessProbe: { httpGet: { path: "/", port }, initialDelaySeconds: 10, periodSeconds: 5 },
+      },
+      {
+        name: "tunnel",
+        image: "cloudflare/cloudflared:latest",
+        command: ["cloudflared", "tunnel", "--url", `http://localhost:${port}`],
+        resources: {
+          requests: { cpu: "50m", memory: "64Mi" },
+          limits: { cpu: "100m", memory: "128Mi" },
+        },
+      }
+    ];
+
+    if (deployment.isFullStack) {
+      containers.splice(1, 0, {
+        name: "backend",
+        image: imageName.replace("localhost:5000", "registry:5000") + "-backend",
+        ports: [{ containerPort: 4000 }],
+        env: [
+          { name: "PORT", value: "4000" },
+          { name: "REDIS_URL", value: "redis://localhost:6379" },
+          { name: "NODE_ENV", value: "production" }
+        ],
+        volumeMounts: [
+          { name: "docker-socket", mountPath: "/var/run/docker.sock" }
+        ],
+        resources: {
+          requests: { cpu: "100m", memory: "128Mi" },
+          limits: { cpu: "500m", memory: "512Mi" },
+        }
+      });
+      // Add Redis sidecar
+      containers.push({
+        name: "redis",
+        image: "redis:alpine",
+        ports: [{ containerPort: 6379 }],
+        resources: {
+          requests: { cpu: "50m", memory: "64Mi" },
+          limits: { cpu: "100m", memory: "128Mi" },
+        }
+      });
+    }
+
+    const k8sDeployment = {
+      apiVersion: "apps/v1",
+      kind: "Deployment",
+      metadata: { name, namespace: NAMESPACE, labels: { app: name, "managed-by": "weblaunch" } },
+      spec: {
+        replicas,
+        selector: { matchLabels: { app: name } },
+        template: {
+          metadata: { labels: { app: name } },
+          spec: {
+            containers: containers,
+            volumes: [
+              {
+                name: "docker-socket",
+                hostPath: { path: "/var/run/docker.sock", type: "Socket" }
+              }
+            ]
+          },
         },
       },
-    },
-  };
+    };
 
   try {
     await k8sApps.readNamespacedDeployment(name, NAMESPACE);
@@ -120,21 +169,28 @@ async function deployToK8s(deployment, imageName, onLog) {
     },
     spec: {
       ingressClassName: "traefik",
-      rules: [{
-        host: hostname,
-        http: {
-          paths: [{
-            path: "/",
-            pathType: "Prefix",
-            backend: {
-              service: {
-                name,
-                port: { number: 80 }
-              }
-            }
-          }]
+      rules: [
+        {
+          host: hostname,
+          http: {
+            paths: [{
+              path: "/",
+              pathType: "Prefix",
+              backend: { service: { name, port: { number: 80 } } }
+            }]
+          }
+        },
+        {
+          // Catch-all rule for Cloudflare Tunnel / External access
+          http: {
+            paths: [{
+              path: "/",
+              pathType: "Prefix",
+              backend: { service: { name, port: { number: 80 } } }
+            }]
+          }
         }
-      }]
+      ]
     }
   };
 
@@ -147,7 +203,42 @@ async function deployToK8s(deployment, imageName, onLog) {
     onLog(`🛤️  Created Ingress: ${hostname}`);
   }
 
-  return { k8sName: name, namespace: NAMESPACE, servicePort: 80, hostname };
+  const startTime = new Date(Date.now() - 30000); // 30s buffer to catch pods created just before this call
+  const publicUrl = await getCloudflareUrl(name, startTime, onLog);
+
+  return { k8sName: name, namespace: NAMESPACE, servicePort: 80, hostname, publicUrl };
+}
+
+async function getCloudflareUrl(name, startTime, onLog) {
+  onLog("⏳ Waiting for Cloudflare Tunnel URL...");
+  for (let i = 0; i < 40; i++) {
+    try {
+      const pods = await k8sCore.listNamespacedPod(NAMESPACE, undefined, undefined, undefined, undefined, `app=${name}`);
+      
+      // Filter for pods created AFTER we started this deployment
+      const latestPod = pods.body.items
+        .filter(p => !p.metadata.deletionTimestamp && p.status.phase === "Running")
+        .filter(p => new Date(p.metadata.creationTimestamp) >= startTime)
+        .sort((a, b) => new Date(b.metadata.creationTimestamp) - new Date(a.metadata.creationTimestamp))[0];
+
+      if (latestPod) {
+        const response = await k8sCore.readNamespacedPodLog(latestPod.metadata.name, NAMESPACE, "tunnel");
+        const logs = response.body.toString();
+        const match = logs.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+        
+        if (match) {
+          const url = match[0].trim();
+          onLog(`🌐 Public URL generated: ${url}`);
+          return url;
+        }
+      }
+    } catch (err) {
+      // Ignore errors during startup
+    }
+    await new Promise(r => setTimeout(r, 3000));
+    if (i % 10 === 0 && i > 0) onLog("... still waiting for tunnel assignment ...");
+  }
+  return null;
 }
 
 async function getPodStatus(name) {

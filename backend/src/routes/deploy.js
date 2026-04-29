@@ -75,6 +75,8 @@ router.post("/", async (req, res, next) => {
       buildCmd: analysis.buildCmd,
       startCmd: analysis.startCmd,
       port: analysis.port,
+      rootDir: analysis.rootDir,
+      isFullStack: analysis.isFullStack,
       hasDockerfile: analysis.hasDockerfile,
       status: "queued",
       createdAt: new Date().toISOString(),
