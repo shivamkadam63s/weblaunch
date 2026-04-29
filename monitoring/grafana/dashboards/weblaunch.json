@@ -1,55 +1,377 @@
 {
-  "title": "WebLaunch Overview",
-  "uid": "weblaunch-overview",
+  "title": "🖥️ Server Overview",
+  "uid": "weblaunch-server-overview",
+  "description": "Combined host + container resource load for the WebLaunch server",
   "version": 1,
   "schemaVersion": 38,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["weblaunch", "server"],
   "panels": [
+
     {
-      "id": 1, "type": "stat", "title": "Backend Status",
-      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
-      "targets": [{ "expr": "up{job=\"weblaunch-backend\"}", "refId": "A" }],
-      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }] } }
+      "id": 1,
+      "type": "row",
+      "title": "📊 Host Machine",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
     },
+
     {
-      "id": 2, "type": "gauge", "title": "CPU Usage %",
-      "gridPos": { "x": 4, "y": 0, "w": 5, "h": 4 },
-      "targets": [{ "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "refId": "A" }],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "minVizWidth": 75 },
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 85 }] } } }
+      "id": 2,
+      "type": "gauge",
+      "title": "CPU Usage",
+      "description": "Total host CPU utilisation across all cores",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)",
+        "legendFormat": "CPU %",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 65 },
+              { "color": "red", "value": 85 }
+            ]
+          }
+        }
+      }
     },
+
     {
-      "id": 3, "type": "gauge", "title": "Memory Usage %",
-      "gridPos": { "x": 9, "y": 0, "w": 5, "h": 4 },
-      "targets": [{ "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100", "refId": "A" }],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "yellow", "value": 75 }, { "color": "red", "value": 90 }] } } }
+      "id": 3,
+      "type": "gauge",
+      "title": "RAM Usage",
+      "description": "Host memory utilisation",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+        "legendFormat": "RAM %",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 75 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
     },
+
     {
-      "id": 4, "type": "timeseries", "title": "CPU Over Time",
-      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
-      "targets": [{ "expr": "100 - (avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)", "legendFormat": "CPU - {{instance}}", "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "palette-classic" } } }
+      "id": 4,
+      "type": "stat",
+      "title": "RAM Used / Total",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 5 },
+      "targets": [
+        {
+          "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024 / 1024",
+          "legendFormat": "Used GB",
+          "refId": "A"
+        },
+        {
+          "expr": "node_memory_MemTotal_bytes / 1024 / 1024 / 1024",
+          "legendFormat": "Total GB",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "vertical",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
     },
+
     {
-      "id": 5, "type": "timeseries", "title": "Memory Over Time",
-      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 6 },
-      "targets": [{ "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024", "legendFormat": "Memory MB", "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "megabytes" } }
+      "id": 5,
+      "type": "stat",
+      "title": "Disk Usage",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "(node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"} - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"}) / node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"} * 100",
+        "legendFormat": "Disk %",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
     },
+
     {
-      "id": 6, "type": "timeseries", "title": "Container CPU",
-      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 6 },
-      "targets": [{ "expr": "rate(container_cpu_usage_seconds_total{name=~\"weblaunch.*\"}[2m]) * 100", "legendFormat": "{{name}}", "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "percent" } }
+      "id": 6,
+      "type": "stat",
+      "title": "Running Containers",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "count(container_last_seen{name!=\"\", name!~\".*POD.*\"})",
+        "legendFormat": "Containers",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
     },
+
     {
-      "id": 7, "type": "timeseries", "title": "Container Memory",
-      "gridPos": { "x": 12, "y": 10, "w": 12, "h": 6 },
-      "targets": [{ "expr": "container_memory_usage_bytes{name=~\"weblaunch.*\"} / 1024 / 1024", "legendFormat": "{{name}}", "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "megabytes" } }
+      "id": 7,
+      "type": "stat",
+      "title": "Backend Status",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "up{job=\"weblaunch-backend\"}",
+        "legendFormat": "Backend",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{
+            "type": "value",
+            "options": {
+              "0": { "text": "⬤ DOWN", "color": "red" },
+              "1": { "text": "⬤ UP",   "color": "green" }
+            }
+          }],
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "CPU Usage Over Time",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "100 - (avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)",
+        "legendFormat": "CPU %",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": true
+          }
+        }
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "RAM Usage Over Time",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "node_memory_MemTotal_bytes / 1024 / 1024 / 1024",
+          "legendFormat": "Total",
+          "refId": "A"
+        },
+        {
+          "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024 / 1024",
+          "legendFormat": "Used",
+          "refId": "B"
+        },
+        {
+          "expr": "node_memory_MemAvailable_bytes / 1024 / 1024 / 1024",
+          "legendFormat": "Available",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Total" },   "properties": [{ "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Used" },    "properties": [{ "id": "color", "value": { "fixedColor": "#E02F44", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Available" },"properties": [{ "id": "color", "value": { "fixedColor": "#37872D", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Network I/O (host)",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[2m])",
+          "legendFormat": "↓ Inbound  {{device}}",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[2m])",
+          "legendFormat": "↑ Outbound {{device}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Disk I/O",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "rate(node_disk_read_bytes_total[2m])",
+          "legendFormat": "Read  {{device}}",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(node_disk_written_bytes_total[2m])",
+          "legendFormat": "Write {{device}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+
+    {
+      "id": 20,
+      "type": "row",
+      "title": "🐳 All Containers",
+      "gridPos": { "x": 0, "y": 21, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Container CPU — All",
+      "description": "CPU usage per container (WebLaunch + deployed apps)",
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name!=\"\", name!~\".*POD.*\"}[2m])) * 100",
+        "legendFormat": "{{name}}",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": { "fillOpacity": 8, "lineWidth": 1.5, "spanNulls": true }
+        }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] } }
+    },
+
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Container RAM — All",
+      "description": "Memory usage per container",
+      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "container_memory_usage_bytes{name!=\"\", name!~\".*POD.*\"} / 1024 / 1024",
+        "legendFormat": "{{name}}",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "megabytes",
+          "custom": { "fillOpacity": 8, "lineWidth": 1.5, "spanNulls": true }
+        }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] } }
     }
   ]
 }

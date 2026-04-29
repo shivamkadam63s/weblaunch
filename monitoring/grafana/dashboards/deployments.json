@@ -1,0 +1,326 @@
+{
+  "title": "📦 Per-Deployment Resources",
+  "uid": "weblaunch-per-deployment",
+  "description": "Resource usage for a single deployed application. Use the dropdown to select a deployment.",
+  "version": 1,
+  "schemaVersion": 38,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["weblaunch", "deployment"],
+  "templating": {
+    "list": [
+      {
+        "name": "deployment",
+        "label": "Deployment",
+        "description": "Select a deployed application container",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": {
+          "query": "label_values(container_cpu_usage_seconds_total{name!=\"\", name!~\".*POD.*|.*pause.*|.*k3s.*|.*registry.*|.*redis.*|.*prometheus.*|.*grafana.*|.*cadvisor.*|.*node-exporter.*|.*weblaunch-backend.*|.*weblaunch-frontend.*\"}, name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {}
+      },
+      {
+        "name": "datasource",
+        "label": "Data Source",
+        "type": "datasource",
+        "pluginId": "prometheus",
+        "hide": 2
+      }
+    ]
+  },
+  "panels": [
+
+    {
+      "id": 1,
+      "type": "row",
+      "title": "📊 $deployment — Summary",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 2,
+      "type": "gauge",
+      "title": "CPU Usage",
+      "gridPos": { "x": 0, "y": 1, "w": 5, "h": 5 },
+      "targets": [{
+        "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"$deployment.*\"}[2m])) * 100",
+        "legendFormat": "CPU %",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 3,
+      "type": "gauge",
+      "title": "RAM Usage",
+      "gridPos": { "x": 5, "y": 1, "w": 5, "h": 5 },
+      "targets": [{
+        "expr": "sum(container_memory_usage_bytes{name=~\"$deployment.*\"}) / 1024 / 1024",
+        "legendFormat": "RAM MB",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "megabytes",
+          "min": 0,
+          "max": 512,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 300 },
+              { "color": "red", "value": 450 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Network In",
+      "gridPos": { "x": 10, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "sum(rate(container_network_receive_bytes_total{name=~\"$deployment.*\"}[2m]))",
+        "legendFormat": "Rx",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Network Out",
+      "gridPos": { "x": 14, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "sum(rate(container_network_transmit_bytes_total{name=~\"$deployment.*\"}[2m]))",
+        "legendFormat": "Tx",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "purple", "value": null }]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Container Restarts",
+      "gridPos": { "x": 18, "y": 1, "w": 3, "h": 5 },
+      "targets": [{
+        "expr": "sum(container_restart_count{name=~\"$deployment.*\"})",
+        "legendFormat": "Restarts",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Container Up Since",
+      "gridPos": { "x": 21, "y": 1, "w": 3, "h": 5 },
+      "targets": [{
+        "expr": "time() - container_start_time_seconds{name=~\"$deployment.*\"}",
+        "legendFormat": "Uptime",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dtdurations",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 10,
+      "type": "row",
+      "title": "📈 Resource Trends",
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "CPU Usage Over Time",
+      "gridPos": { "x": 0, "y": 7, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"$deployment.*\"}[2m])) * 100",
+        "legendFormat": "CPU %",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "spanNulls": true }
+        }
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "RAM Usage Over Time",
+      "gridPos": { "x": 12, "y": 7, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(container_memory_usage_bytes{name=~\"$deployment.*\"}) / 1024 / 1024",
+          "legendFormat": "RSS Used MB",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(container_memory_cache{name=~\"$deployment.*\"}) / 1024 / 1024",
+          "legendFormat": "Cache MB",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "megabytes",
+          "custom": { "fillOpacity": 15, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Network I/O",
+      "gridPos": { "x": 0, "y": 15, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum(rate(container_network_receive_bytes_total{name=~\"$deployment.*\"}[2m]))",
+          "legendFormat": "↓ Receive",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(container_network_transmit_bytes_total{name=~\"$deployment.*\"}[2m]))",
+          "legendFormat": "↑ Transmit",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "fillOpacity": 12, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Filesystem I/O",
+      "gridPos": { "x": 12, "y": 15, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum(rate(container_fs_reads_bytes_total{name=~\"$deployment.*\"}[2m]))",
+          "legendFormat": "Read",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(container_fs_writes_bytes_total{name=~\"$deployment.*\"}[2m]))",
+          "legendFormat": "Write",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "fillOpacity": 12, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    }
+  ]
+}
