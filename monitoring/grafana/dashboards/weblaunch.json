@@ -1,8 +1,8 @@
 {
   "title": "🖥️ Server Overview",
-  "uid": "weblaunch-overview-fixed-v3",
-  "description": "Combined host + container resource load for the WebLaunch server",
-  "version": 3,
+  "uid": "weblaunch-overview-v4",
+  "description": "Full visibility into both Platform and Deployed App resources",
+  "version": 4,
   "schemaVersion": 38,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
@@ -12,284 +12,139 @@
     {
       "id": 1,
       "type": "row",
-      "title": "📊 Host Machine",
+      "title": "📊 Host & Platform Summary",
       "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
       "collapsed": false
     },
     {
       "id": 2,
       "type": "gauge",
-      "title": "CPU Usage",
+      "title": "Host CPU",
       "gridPos": { "x": 0, "y": 1, "w": 4, "h": 5 },
       "targets": [{
         "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)",
-        "legendFormat": "CPU %",
-        "refId": "A"
+        "legendFormat": "Host CPU %"
       }],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 65 },
-              { "color": "red", "value": 85 }
-            ]
-          }
-        }
-      }
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
     },
     {
       "id": 3,
       "type": "gauge",
-      "title": "RAM Usage",
+      "title": "Host RAM",
       "gridPos": { "x": 4, "y": 1, "w": 4, "h": 5 },
       "targets": [{
         "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
-        "legendFormat": "RAM %",
-        "refId": "A"
+        "legendFormat": "Host RAM %"
       }],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 75 },
-              { "color": "red", "value": 90 }
-            ]
-          }
-        }
-      }
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
     },
     {
-      "id": 4,
+      "id": 6,
       "type": "stat",
-      "title": "RAM Used / Total",
+      "title": "Total Containers",
+      "description": "Total number of leaf containers (System + Apps)",
       "gridPos": { "x": 8, "y": 1, "w": 4, "h": 5 },
-      "targets": [
-        {
-          "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024 / 1024",
-          "legendFormat": "Used GB",
-          "refId": "A"
-        },
-        {
-          "expr": "node_memory_MemTotal_bytes / 1024 / 1024 / 1024",
-          "legendFormat": "Total GB",
-          "refId": "B"
-        }
-      ],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "orientation": "vertical",
-        "colorMode": "background"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 1,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "blue", "value": null }]
-          }
-        }
-      }
+      "targets": [{
+        "expr": "count(container_last_seen{id=~\"/docker/.*/.*/.*\"})",
+        "legendFormat": "Containers"
+      }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } }
+    },
+    {
+      "id": 25,
+      "type": "stat",
+      "title": "Deployed Apps (K8s)",
+      "description": "Number of containers running inside the Kubernetes cluster",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "count(container_last_seen{id=~\".*kubepods/.*/pod.*/.*\"})",
+        "legendFormat": "Apps"
+      }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] } } }
     },
     {
       "id": 5,
       "type": "stat",
       "title": "Disk Usage",
-      "description": "Main disk usage percentage (auto-detected)",
-      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 5 },
-      "targets": [{
-        "expr": "max((node_filesystem_size_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"} - node_filesystem_avail_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"}) / node_filesystem_size_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"}) * 100",
-        "legendFormat": "Disk %",
-        "refId": "A"
-      }],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "colorMode": "background"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 70 },
-              { "color": "red", "value": 90 }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "id": 6,
-      "type": "stat",
-      "title": "Running Containers",
       "gridPos": { "x": 16, "y": 1, "w": 4, "h": 5 },
       "targets": [{
-        "expr": "count(container_last_seen{id=~\"/docker/.*\", id!~\".*kubepods.*\"})",
-        "legendFormat": "Containers",
-        "refId": "A"
+        "expr": "max((node_filesystem_size_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"} - node_filesystem_avail_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"}) / node_filesystem_size_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"}) * 100"
       }],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "colorMode": "background"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "blue", "value": null }]
-          }
-        }
-      }
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1 } }
     },
     {
       "id": 7,
       "type": "stat",
       "title": "Backend Status",
       "gridPos": { "x": 20, "y": 1, "w": 4, "h": 5 },
-      "targets": [{
-        "expr": "up{job=\"weblaunch-backend\"}",
-        "legendFormat": "Backend",
-        "refId": "A"
-      }],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "colorMode": "background"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [{
-            "type": "value",
-            "options": {
-              "0": { "text": "⬤ DOWN", "color": "red" },
-              "1": { "text": "⬤ UP",   "color": "green" }
-            }
-          }],
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "id": 10,
-      "type": "timeseries",
-      "title": "CPU Usage Over Time",
-      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
-      "targets": [{
-        "expr": "100 - (avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)",
-        "legendFormat": "CPU %",
-        "refId": "A"
-      }],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "color": { "mode": "palette-classic" },
-          "custom": { "fillOpacity": 15, "lineWidth": 2, "spanNulls": true }
-        }
-      }
-    },
-    {
-      "id": 11,
-      "type": "timeseries",
-      "title": "RAM Usage Over Time",
-      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
-      "targets": [
-        {
-          "expr": "node_memory_MemTotal_bytes / 1024 / 1024 / 1024",
-          "legendFormat": "Total GB",
-          "refId": "A"
-        },
-        {
-          "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024 / 1024",
-          "legendFormat": "Used GB",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
-        }
-      }
+      "targets": [{ "expr": "up{job=\"weblaunch-backend\"}" }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "0": { "text": "⬤ DOWN", "color": "red" }, "1": { "text": "⬤ UP", "color": "green" } } }] } }
     },
     {
       "id": 20,
       "type": "row",
-      "title": "🐳 All Containers",
-      "gridPos": { "x": 0, "y": 21, "w": 24, "h": 1 },
+      "title": "🚀 Deployed Applications (K8s Pods)",
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
       "collapsed": false
     },
     {
       "id": 21,
       "type": "timeseries",
-      "title": "Container CPU — All",
-      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+      "title": "App CPU Usage",
+      "description": "CPU usage of containers running in K3s (your websites)",
+      "gridPos": { "x": 0, "y": 7, "w": 12, "h": 8 },
       "targets": [{
-        "expr": "sum by (id) (rate(container_cpu_usage_seconds_total{id=~\"/docker/.*\", id!~\".*kubepods.*\"}[2m])) * 100",
-        "legendFormat": "{{id}}",
-        "refId": "A"
+        "expr": "sum by (id) (rate(container_cpu_usage_seconds_total{id=~\".*kubepods/.*/pod.*/.*\"}[2m])) * 100",
+        "legendFormat": "{{id}}"
       }],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "custom": { "fillOpacity": 8, "lineWidth": 1.5, "spanNulls": true }
-        }
-      },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right" }
-      }
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "fillOpacity": 15, "lineWidth": 2 } } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } }
     },
     {
       "id": 22,
       "type": "timeseries",
-      "title": "Container RAM — All",
-      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+      "title": "App RAM Usage",
+      "description": "Memory usage of containers running in K3s (your websites)",
+      "gridPos": { "x": 12, "y": 7, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "container_memory_usage_bytes{id=~\".*kubepods/.*/pod.*/.*\"} / 1024 / 1024",
+        "legendFormat": "{{id}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "megabytes", "custom": { "fillOpacity": 15, "lineWidth": 2 } } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } }
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "⚙️ Platform Infrastructure",
+      "gridPos": { "x": 0, "y": 15, "w": 24, "h": 1 },
+      "collapsed": true
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Infrastructure CPU",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum by (id) (rate(container_cpu_usage_seconds_total{id=~\"/docker/.*\", id!~\".*kubepods.*\"}[2m])) * 100",
+        "legendFormat": "{{id}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Infrastructure RAM",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
       "targets": [{
         "expr": "container_memory_usage_bytes{id=~\"/docker/.*\", id!~\".*kubepods.*\"} / 1024 / 1024",
-        "legendFormat": "{{id}}",
-        "refId": "A"
+        "legendFormat": "{{id}}"
       }],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "megabytes",
-          "custom": { "fillOpacity": 8, "lineWidth": 1.5, "spanNulls": true }
-        }
-      },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right" }
-      }
+      "fieldConfig": { "defaults": { "unit": "megabytes" } }
     }
   ]
 }

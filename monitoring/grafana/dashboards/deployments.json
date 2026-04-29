@@ -1,6 +1,6 @@
 {
   "title": "📦 Per-Deployment Resources",
-  "uid": "weblaunch-deployments-v3",
+  "uid": "weblaunch-deployments-v4",
   "description": "Resource usage for a single deployed application. Use the dropdown to select a deployment.",
   "version": 2,
   "schemaVersion": 38,
