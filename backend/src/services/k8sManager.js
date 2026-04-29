@@ -171,4 +171,14 @@ async function deleteDeployment(name) {
   }
 }
 
-module.exports = { deployToK8s, getPodStatus, deleteDeployment };
+async function getPodsInNamespace() {
+  try {
+    const pods = await k8sCore.listNamespacedPod(NAMESPACE);
+    return pods.body.items;
+  } catch (err) {
+    logger.error(`Error listing pods: ${err.message}`);
+    return [];
+  }
+}
+
+module.exports = { deployToK8s, getPodStatus, deleteDeployment, getPodsInNamespace };

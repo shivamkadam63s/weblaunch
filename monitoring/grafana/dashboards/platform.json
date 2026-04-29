@@ -1,0 +1,404 @@
+{
+  "title": "🚀 WebLaunch Platform",
+  "uid": "weblaunch-platform-v6",
+  "description": "WebLaunch platform health — deployment counts, queue, API performance and error rates",
+  "version": 2,
+  "schemaVersion": 38,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["weblaunch", "platform"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "📊 Platform Health",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Active Deployments",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "weblaunch_active_deployments_total",
+        "legendFormat": "Active",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Queue Size",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "weblaunch_queue_size",
+        "legendFormat": "Queued",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red", "value": 8 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Deployment Errors (total)",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "sum(weblaunch_deployment_errors_total) or vector(0)",
+        "legendFormat": "Errors",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "API Request Rate",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "sum(rate(http_request_duration_seconds_count[2m]))",
+        "legendFormat": "req/s",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "API Error Rate",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "sum(rate(http_request_duration_seconds_count{status_code=~\"5..\"}[2m])) / sum(rate(http_request_duration_seconds_count[2m])) * 100",
+        "legendFormat": "Error %",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Backend Uptime",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "process_uptime_seconds{job=\"weblaunch-backend\"}",
+        "legendFormat": "Uptime",
+        "refId": "A"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dtdurations",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "📈 Deployment Activity",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Active Deployments Over Time",
+      "gridPos": { "x": 0, "y": 6, "w": 8, "h": 7 },
+      "targets": [{
+        "expr": "weblaunch_active_deployments_total",
+        "legendFormat": "Active",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Deployment Queue Over Time",
+      "gridPos": { "x": 8, "y": 6, "w": 8, "h": 7 },
+      "targets": [{
+        "expr": "weblaunch_queue_size",
+        "legendFormat": "Queue",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Deployment Errors Over Time",
+      "gridPos": { "x": 16, "y": 6, "w": 8, "h": 7 },
+      "targets": [{
+        "expr": "sum by (error_type) (rate(weblaunch_deployment_errors_total[5m]))",
+        "legendFormat": "{{error_type}}",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 15, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "⚡ API Performance",
+      "gridPos": { "x": 0, "y": 13, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Request Rate by Route",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum by (route, method) (rate(http_request_duration_seconds_count[2m]))",
+        "legendFormat": "{{method}} {{route}}",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
+        }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Request Latency (p50 / p95 / p99)",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le)(rate(http_request_duration_seconds_bucket[2m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le)(rate(http_request_duration_seconds_bucket[2m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le)(rate(http_request_duration_seconds_bucket[2m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "fillOpacity": 8, "lineWidth": 2, "spanNulls": true }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "p95" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "p99" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "HTTP Status Codes",
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "sum by (status_code) (rate(http_request_duration_seconds_count[2m]))",
+        "legendFormat": "HTTP {{status_code}}",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Deployment Duration (p50 / p95)",
+      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, stack_type)(rate(weblaunch_deployment_duration_seconds_bucket[10m])))",
+          "legendFormat": "p50 {{stack_type}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, stack_type)(rate(weblaunch_deployment_duration_seconds_bucket[10m])))",
+          "legendFormat": "p95 {{stack_type}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "🔧 Backend Process",
+      "gridPos": { "x": 0, "y": 29, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Node.js Heap Usage",
+      "gridPos": { "x": 0, "y": 30, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "nodejs_heap_size_used_bytes{job=\"weblaunch-backend\"} / 1024 / 1024",
+          "legendFormat": "Heap Used MB",
+          "refId": "A"
+        },
+        {
+          "expr": "nodejs_heap_size_total_bytes{job=\"weblaunch-backend\"} / 1024 / 1024",
+          "legendFormat": "Heap Total MB",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "megabytes",
+          "custom": { "fillOpacity": 12, "lineWidth": 2, "spanNulls": true }
+        }
+      }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Node.js Event Loop Lag",
+      "gridPos": { "x": 12, "y": 30, "w": 12, "h": 6 },
+      "targets": [{
+        "expr": "nodejs_eventloop_lag_seconds{job=\"weblaunch-backend\"} * 1000",
+        "legendFormat": "Event Loop Lag ms",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "fillOpacity": 12, "lineWidth": 2, "spanNulls": true },
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

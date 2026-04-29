@@ -1,55 +1,146 @@
 {
-  "title": "WebLaunch Overview",
-  "uid": "weblaunch-overview",
-  "version": 1,
+  "title": "🖥️ Server Overview",
+  "uid": "weblaunch-overview-v6",
+  "description": "Premium visibility with human-readable website names for all deployments.",
+  "version": 6,
   "schemaVersion": 38,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["weblaunch", "server"],
   "panels": [
     {
-      "id": 1, "type": "stat", "title": "Backend Status",
-      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
-      "targets": [{ "expr": "up{job=\"weblaunch-backend\"}", "refId": "A" }],
-      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }] } }
+      "id": 1,
+      "type": "row",
+      "title": "📊 Host & Platform Summary",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
     },
     {
-      "id": 2, "type": "gauge", "title": "CPU Usage %",
-      "gridPos": { "x": 4, "y": 0, "w": 5, "h": 4 },
-      "targets": [{ "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "refId": "A" }],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "minVizWidth": 75 },
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 85 }] } } }
+      "id": 2,
+      "type": "gauge",
+      "title": "Host CPU",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)"
+      }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
     },
     {
-      "id": 3, "type": "gauge", "title": "Memory Usage %",
-      "gridPos": { "x": 9, "y": 0, "w": 5, "h": 4 },
-      "targets": [{ "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100", "refId": "A" }],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "yellow", "value": 75 }, { "color": "red", "value": 90 }] } } }
+      "id": 3,
+      "type": "gauge",
+      "title": "Host RAM",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100"
+      }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
     },
     {
-      "id": 4, "type": "timeseries", "title": "CPU Over Time",
-      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
-      "targets": [{ "expr": "100 - (avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)", "legendFormat": "CPU - {{instance}}", "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "palette-classic" } } }
+      "id": 6,
+      "type": "stat",
+      "title": "Total Containers",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "count(container_last_seen{id=~\"/docker/.*/.*/.*\"})"
+      }],
+      "options": { "colorMode": "background" }
     },
     {
-      "id": 5, "type": "timeseries", "title": "Memory Over Time",
-      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 6 },
-      "targets": [{ "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024", "legendFormat": "Memory MB", "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "megabytes" } }
+      "id": 25,
+      "type": "stat",
+      "title": "Running Apps",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "weblaunch_active_deployments_total"
+      }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] } } }
     },
     {
-      "id": 6, "type": "timeseries", "title": "Container CPU",
-      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 6 },
-      "targets": [{ "expr": "rate(container_cpu_usage_seconds_total{name=~\"weblaunch.*\"}[2m]) * 100", "legendFormat": "{{name}}", "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "percent" } }
+      "id": 5,
+      "type": "stat",
+      "title": "Disk Usage",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 5 },
+      "targets": [{
+        "expr": "max((node_filesystem_size_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"} - node_filesystem_avail_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"}) / node_filesystem_size_bytes{fstype!~\"tmpfs|shm|devtmpfs|overlay\"}) * 100"
+      }],
+      "options": { "colorMode": "background" }
     },
     {
-      "id": 7, "type": "timeseries", "title": "Container Memory",
-      "gridPos": { "x": 12, "y": 10, "w": 12, "h": 6 },
-      "targets": [{ "expr": "container_memory_usage_bytes{name=~\"weblaunch.*\"} / 1024 / 1024", "legendFormat": "{{name}}", "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "megabytes" } }
+      "id": 7,
+      "type": "stat",
+      "title": "Backend Status",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 5 },
+      "targets": [{ "expr": "up{job=\"weblaunch-backend\"}" }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "0": { "text": "⬤ DOWN", "color": "red" }, "1": { "text": "⬤ UP", "color": "green" } } }] } }
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "🚀 Deployed Applications (Your Websites)",
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "App CPU Usage",
+      "description": "Real-time CPU load for each of your deployed websites.",
+      "gridPos": { "x": 0, "y": 7, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum by (deployment_name) (label_replace(rate(container_cpu_usage_seconds_total{id=~\".*/kubepods/.*/pod.*/.*\"}[2m]), \"container_id\", \"$1\", \"id\", \".*/(.*)\") * on(container_id) group_left(deployment_name) weblaunch_pod_info)",
+        "legendFormat": "{{deployment_name}}",
+        "refId": "A"
+      }],
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "fillOpacity": 20, "lineWidth": 3 } } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "App RAM Usage",
+      "description": "Memory consumption for each of your deployed websites.",
+      "gridPos": { "x": 12, "y": 7, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum by (deployment_name) (label_replace(container_memory_usage_bytes{id=~\".*/kubepods/.*/pod.*/.*\"}, \"container_id\", \"$1\", \"id\", \".*/(.*)\") * on(container_id) group_left(deployment_name) weblaunch_pod_info) / 1024 / 1024",
+        "legendFormat": "{{deployment_name}}",
+        "refId": "A"
+      }],
+      "fieldConfig": { "defaults": { "unit": "megabytes", "custom": { "fillOpacity": 20, "lineWidth": 3 } } },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } }
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "⚙️ Platform Infrastructure",
+      "gridPos": { "x": 0, "y": 15, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Infrastructure CPU",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum by (id) (rate(container_cpu_usage_seconds_total{id=~\"/docker/.*\", id!~\".*kubepods.*\"}[2m])) * 100",
+        "legendFormat": "{{id}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "percent" } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Infrastructure RAM",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "container_memory_usage_bytes{id=~\"/docker/.*\", id!~\".*kubepods.*\"} / 1024 / 1024",
+        "legendFormat": "{{id}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "megabytes" } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
     }
   ]
 }
