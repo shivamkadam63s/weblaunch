@@ -43,6 +43,13 @@ const deploymentErrors = new client.Counter({
     registers: [register]
 });
 
+const podInfo = new client.Gauge({
+    name: 'weblaunch_pod_info',
+    help: 'Mapping between container IDs and pod/deployment names',
+    labelNames: ['container_id', 'pod_name', 'deployment_name'],
+    registers: [register]
+});
+
 // Middleware to measure request duration
 const measureRequestDuration = (req, res, next) => {
     const start = Date.now();
@@ -55,9 +62,38 @@ const measureRequestDuration = (req, res, next) => {
     next();
 };
 
+// Function to update pod info mapping from K8s
+const updatePodInfo = async () => {
+    try {
+        const k8sManager = require('../services/k8sManager');
+        const pods = await k8sManager.getPodsInNamespace(); // Need to add this to k8sManager
+        
+        podInfo.reset();
+        for (const pod of pods) {
+            const deploymentName = pod.metadata.labels?.app || 'unknown';
+            const podName = pod.metadata.name;
+            
+            if (pod.status?.containerStatuses) {
+                for (const status of pod.status.containerStatuses) {
+                    if (status.containerID) {
+                        // containerID is usually "docker://HEX_ID" or "containerd://HEX_ID"
+                        const id = status.containerID.split('://')[1];
+                        if (id) {
+                            podInfo.labels(id, podName, deploymentName).set(1);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        // Silently ignore if K8s is not available yet
+    }
+};
+
 // GET /metrics - Prometheus metrics endpoint
 router.get('/', async (req, res) => {
     try {
+        await updatePodInfo();
         res.set('Content-Type', register.contentType);
         res.end(await register.metrics());
     } catch (err) {
