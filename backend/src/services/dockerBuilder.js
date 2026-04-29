@@ -14,20 +14,22 @@ const docker = new Docker({ socketPath: process.env.DOCKER_SOCKET || "/var/run/d
 function generateDockerfile(stack, framework, buildCmd, startCmd, port) {
   const templates = {
     nodejs: (bc, sc, p) => `
-FROM node:20-alpine AS base
+FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
-${bc ? `FROM base AS builder
+${bc ? `FROM deps AS builder
 COPY . .
 RUN ${bc}
 
 FROM node:20-alpine AS runner
 WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app ./` : `COPY . .`}
+COPY --from=builder /app ./` : `FROM deps AS runner
+WORKDIR /app
+COPY . .`}
 
 EXPOSE ${p}
 ENV PORT=${p}
@@ -127,7 +129,9 @@ async function buildImage(deployment, onLog) {
   try {
     onLog(`📥 Cloning repository: ${repoUrl}`);
     const git = simpleGit();
-    await git.clone(repoUrl, tmpDir, ["--depth", "1", "--branch", branch || "main"]);
+    const cloneOptions = ["--depth", "1"];
+    if (branch) cloneOptions.push("--branch", branch);
+    await git.clone(repoUrl, tmpDir, cloneOptions);
 
     // Write generated Dockerfile if user has none
     if (!hasDockerfile) {
@@ -138,7 +142,10 @@ async function buildImage(deployment, onLog) {
       onLog("📄 Using repository's own Dockerfile");
     }
 
-    const imageName = `weblaunch/${deployment.name}:${id.slice(0, 8)}`;
+    const registryPrefix = "localhost:5000";
+    const baseName = `${deployment.name}:${id.slice(0, 8)}`;
+    const imageName = `${registryPrefix}/${baseName}`;
+    
     onLog(`🐳 Building Docker image: ${imageName}`);
 
     await new Promise((resolve, reject) => {
@@ -155,7 +162,19 @@ async function buildImage(deployment, onLog) {
       });
     });
 
-    onLog(`✅ Docker image built: ${imageName}`);
+    onLog(`📤 Pushing image to local registry...`);
+    const image = docker.getImage(imageName);
+    await new Promise((resolve, reject) => {
+      image.push({}, (err, stream) => {
+        if (err) return reject(err);
+        docker.modem.followProgress(stream, (pushErr, output) => {
+          if (pushErr) return reject(pushErr);
+          resolve(output);
+        });
+      });
+    });
+
+    onLog(`✅ Docker image built and pushed: ${imageName}`);
     return imageName;
   } finally {
     await fs.remove(tmpDir).catch(() => {});

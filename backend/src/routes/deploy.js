@@ -18,7 +18,7 @@ const deploySchema = Joi.object({
       "string.pattern.base": "Only GitHub repository URLs are supported",
       "string.uri": "Must be a valid URL",
     }),
-  branch: Joi.string().default("main"),
+  branch: Joi.string().allow("", null).optional(),
   envVars: Joi.object().pattern(Joi.string(), Joi.string()).default({}),
   replicas: Joi.number().integer().min(1).max(10).default(1),
   projectName: Joi.string()

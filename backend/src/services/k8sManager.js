@@ -1,22 +1,38 @@
 const k8s = require("@kubernetes/client-node");
 const yaml = require("js-yaml");
 const logger = require("../utils/logger");
+const fs = require("fs");
 
 const kc = new k8s.KubeConfig();
 
-// Load config from cluster (in-cluster) or from kubeconfig file
+// Load config from shared K3s file or fallback to default locations
+const k3sConfigPath = "/root/.kube/k3s.yaml";
 try {
-  kc.loadFromCluster();
-} catch {
-  try {
+  if (fs.existsSync(k3sConfigPath)) {
+    kc.loadFromFile(k3sConfigPath);
+    const cluster = kc.getCurrentCluster();
+    if (cluster && (cluster.server.includes("127.0.0.1") || cluster.server.includes("localhost"))) {
+      cluster.server = "https://k3s:6443";
+      cluster.skipTLSVerify = true;
+    }
+    logger.info(`✅ Successfully loaded KubeConfig from ${k3sConfigPath}`);
+  } else {
     kc.loadFromDefault();
-  } catch (e) {
-    logger.warn("Kubernetes config not found — K8s features disabled");
+    logger.info("ℹ️  Loaded KubeConfig from default location");
+  }
+} catch (e) {
+  logger.warn(`⚠️  Failed to load KubeConfig: ${e.message}`);
+  try {
+    kc.loadFromCluster();
+    logger.info("ℹ️  Using In-Cluster configuration");
+  } catch (err) {
+    logger.warn("❌ Kubernetes features disabled: No valid config found");
   }
 }
 
 const k8sApps = kc.makeApiClient(k8s.AppsV1Api);
 const k8sCore = kc.makeApiClient(k8s.CoreV1Api);
+const k8sNetworking = kc.makeApiClient(k8s.NetworkingV1Api);
 
 const NAMESPACE = process.env.K8S_NAMESPACE || "weblaunch";
 
@@ -50,7 +66,7 @@ async function deployToK8s(deployment, imageName, onLog) {
         spec: {
           containers: [{
             name,
-            image: imageName,
+            image: imageName.replace("localhost:5000", "registry:5000"),
             ports: [{ containerPort: port }],
             env: Object.entries(deployment.envVars || {}).map(([k, v]) => ({ name: k, value: v })),
             resources: {
@@ -88,8 +104,50 @@ async function deployToK8s(deployment, imageName, onLog) {
     await k8sCore.createNamespacedService(NAMESPACE, service);
   }
   onLog(`🌐 Service created: ${name}`);
+  
+  // Create Ingress
+  const hostname = `${name}.localhost`;
+  const ingress = {
+    apiVersion: "networking.k8s.io/v1",
+    kind: "Ingress",
+    metadata: { 
+      name, 
+      namespace: NAMESPACE, 
+      labels: { app: name },
+      annotations: {
+        "traefik.ingress.kubernetes.io/router.entrypoints": "web"
+      }
+    },
+    spec: {
+      ingressClassName: "traefik",
+      rules: [{
+        host: hostname,
+        http: {
+          paths: [{
+            path: "/",
+            pathType: "Prefix",
+            backend: {
+              service: {
+                name,
+                port: { number: 80 }
+              }
+            }
+          }]
+        }
+      }]
+    }
+  };
 
-  return { k8sName: name, namespace: NAMESPACE, servicePort: 80 };
+  try {
+    await k8sNetworking.readNamespacedIngress(name, NAMESPACE);
+    await k8sNetworking.replaceNamespacedIngress(name, NAMESPACE, ingress);
+    onLog(`🛤️  Updated Ingress: ${hostname}`);
+  } catch {
+    await k8sNetworking.createNamespacedIngress(NAMESPACE, ingress);
+    onLog(`🛤️  Created Ingress: ${hostname}`);
+  }
+
+  return { k8sName: name, namespace: NAMESPACE, servicePort: 80, hostname };
 }
 
 async function getPodStatus(name) {

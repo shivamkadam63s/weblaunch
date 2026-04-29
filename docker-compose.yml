@@ -18,6 +18,8 @@ volumes:
   redis-data:
   prometheus-data:
   grafana-data:
+  k3s-data:
+  k3s-config:
 
 services:
 
@@ -41,6 +43,38 @@ services:
       <<: *labels
       com.weblaunch.service: "frontend"
 
+  # ── Kubernetes (K3s - Lightweight K8s in Docker) ──────────
+  k3s:
+    image: rancher/k3s:v1.29.3-k3s1
+    container_name: weblaunch-k3s
+    entrypoint: /bin/sh
+    command: >
+      -c "
+      mkdir -p /etc/rancher/k3s &&
+      echo 'mirrors:
+        \"registry:5000\":
+          endpoint:
+            - \"http://registry:5000\"' > /etc/rancher/k3s/registries.yaml &&
+      exec /bin/k3s server --write-kubeconfig-mode 644 --tls-san=k3s --tls-san=weblaunch-k3s
+      "
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - K3S_KUBECONFIG_OUTPUT=/output/k3s.yaml
+      - K3S_KUBECONFIG_MODE=666
+    volumes:
+      - k3s-data:/var/lib/rancher/k3s
+      - k3s-config:/output
+    ports:
+      - "6443:6443"
+      - "8081:80"
+      - "8443:443"
+    networks:
+      - weblaunch-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "k3s"
+
   # ── Backend (Node.js / Express) ────────────────────────────
   backend:
     build:
@@ -61,12 +95,16 @@ services:
       - K8S_NAMESPACE=${K8S_NAMESPACE:-weblaunch}
       - API_KEY=${API_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - KUBECONFIG=/root/.kube/k3s.yaml
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./backend/logs:/app/logs
+      - k3s-config:/root/.kube:ro
     depends_on:
       redis:
         condition: service_healthy
+      k3s:
+        condition: service_started
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:4000/health" ]
       interval: 30s
@@ -79,6 +117,19 @@ services:
     labels:
       <<: *labels
       com.weblaunch.service: "backend"
+
+  # ── Local Registry (for K8s to pull images) ────────────────
+  registry:
+    image: registry:2
+    container_name: weblaunch-registry
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    networks:
+      - weblaunch-net
+    labels:
+      <<: *labels
+      com.weblaunch.service: "registry"
 
   # ── Redis (Job Queue + Store) ──────────────────────────────
   redis:

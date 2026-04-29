@@ -25,12 +25,14 @@ const DETECTION_RULES = [
   { name:"Static HTML",   stack:"static",  framework:"static",     check:(f,p,r)=>f.includes("index.html")||f.some(x=>x.endsWith(".html")),                                  buildCmd:null,                                                          startCmd:"npx serve -l 3000",                           port:3000 },
 ];
 
-async function analyzeRepository(repoUrl, branch = "main") {
+async function analyzeRepository(repoUrl, branch) {
   const tmpDir = path.join(os.tmpdir(), `weblaunch-analyze-${uuidv4()}`);
   try {
-    logger.info(`Cloning ${repoUrl}@${branch}`);
+    logger.info(`Cloning ${repoUrl}${branch ? `@${branch}` : ''}`);
     const git = simpleGit();
-    await git.clone(repoUrl, tmpDir, ["--depth", "1", "--branch", branch]);
+    const cloneOptions = ["--depth", "1"];
+    if (branch) cloneOptions.push("--branch", branch);
+    await git.clone(repoUrl, tmpDir, cloneOptions);
     const files = await getAllFiles(tmpDir);
     const relFiles = files.map(f => path.relative(tmpDir, f).replace(/\\/g, "/"));
     let pkg = null;
@@ -45,6 +47,49 @@ async function analyzeRepository(repoUrl, branch = "main") {
     const hasDockerfile = await fs.pathExists(path.join(tmpDir, "Dockerfile"));
     const hasDockerCompose = await fs.pathExists(path.join(tmpDir, "docker-compose.yml")) || await fs.pathExists(path.join(tmpDir, "docker-compose.yaml"));
     const detected = detectStack(relFiles, pkg, requirements);
+
+    // Refine start command for Node.js
+    if (detected.stack === "nodejs" && pkg) {
+      const startScript = pkg.scripts?.start || "";
+      const buildScript = pkg.scripts?.build || "";
+
+      // If `npm start` chains a build (e.g. "npm run build && node scripts/start.js")
+      // split into separate buildCmd + startCmd so the Dockerfile can multi-stage
+      if (startScript && startScript.includes("&&")) {
+        const parts = startScript.split("&&").map(s => s.trim());
+        // Everything except the last part is a build step
+        const buildParts = parts.slice(0, -1);
+        const runPart = parts[parts.length - 1];
+
+        // Normalise: "npm run build" → "npm run build", "node scripts/start.js" kept as-is
+        detected.buildCmd = buildParts.join(" && ");
+        detected.startCmd = runPart;
+      } else if (startScript) {
+        // `npm start` is a single command — keep as-is, no separate buildCmd needed
+        detected.startCmd = "npm start";
+        // But if there's a separate build script that build tools need, flag it
+        if (!detected.buildCmd && buildScript && (
+          buildScript.includes("webpack") ||
+          buildScript.includes("vite") ||
+          buildScript.includes("rollup") ||
+          buildScript.includes("parcel") ||
+          buildScript.includes("gulp")
+        )) {
+          detected.buildCmd = "npm run build";
+        }
+      } else if (pkg.main && (await fs.pathExists(path.join(tmpDir, pkg.main)))) {
+        detected.startCmd = `node ${pkg.main}`;
+      } else {
+        const commonEntries = ["index.js", "server.js", "app.js", "src/index.js", "src/server.js"];
+        for (const entry of commonEntries) {
+          if (await fs.pathExists(path.join(tmpDir, entry))) {
+            detected.startCmd = `node ${entry}`;
+            break;
+          }
+        }
+      }
+    }
+
     return { ...detected, hasDockerfile, hasDockerCompose, files: relFiles.slice(0, 50), totalFiles: relFiles.length, packageJson: pkg ? { name: pkg.name, version: pkg.version, scripts: pkg.scripts } : null };
   } finally {
     await fs.remove(tmpDir).catch(() => {});
