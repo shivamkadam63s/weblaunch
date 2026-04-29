@@ -64,18 +64,29 @@ async function deployToK8s(deployment, imageName, onLog) {
       template: {
         metadata: { labels: { app: name } },
         spec: {
-          containers: [{
-            name,
-            image: imageName.replace("localhost:5000", "registry:5000"),
-            ports: [{ containerPort: port }],
-            env: Object.entries(deployment.envVars || {}).map(([k, v]) => ({ name: k, value: v })),
-            resources: {
-              requests: { cpu: "100m", memory: "128Mi" },
-              limits:   { cpu: "500m", memory: "512Mi" },
+          containers: [
+            {
+              name,
+              image: imageName.replace("localhost:5000", "registry:5000"),
+              ports: [{ containerPort: port }],
+              env: Object.entries(deployment.envVars || {}).map(([k, v]) => ({ name: k, value: v })),
+              resources: {
+                requests: { cpu: "100m", memory: "128Mi" },
+                limits: { cpu: "500m", memory: "512Mi" },
+              },
+              livenessProbe: { httpGet: { path: "/", port }, initialDelaySeconds: 30, periodSeconds: 10 },
+              readinessProbe: { httpGet: { path: "/", port }, initialDelaySeconds: 10, periodSeconds: 5 },
             },
-            livenessProbe:  { httpGet: { path: "/", port }, initialDelaySeconds: 30, periodSeconds: 10 },
-            readinessProbe: { httpGet: { path: "/", port }, initialDelaySeconds: 10, periodSeconds: 5  },
-          }],
+            {
+              name: "tunnel",
+              image: "cloudflare/cloudflared:latest",
+              command: ["cloudflared", "tunnel", "--url", `http://localhost:${port}`],
+              resources: {
+                requests: { cpu: "50m", memory: "64Mi" },
+                limits: { cpu: "100m", memory: "128Mi" },
+              },
+            }
+          ],
         },
       },
     },
@@ -120,21 +131,28 @@ async function deployToK8s(deployment, imageName, onLog) {
     },
     spec: {
       ingressClassName: "traefik",
-      rules: [{
-        host: hostname,
-        http: {
-          paths: [{
-            path: "/",
-            pathType: "Prefix",
-            backend: {
-              service: {
-                name,
-                port: { number: 80 }
-              }
-            }
-          }]
+      rules: [
+        {
+          host: hostname,
+          http: {
+            paths: [{
+              path: "/",
+              pathType: "Prefix",
+              backend: { service: { name, port: { number: 80 } } }
+            }]
+          }
+        },
+        {
+          // Catch-all rule for Cloudflare Tunnel / External access
+          http: {
+            paths: [{
+              path: "/",
+              pathType: "Prefix",
+              backend: { service: { name, port: { number: 80 } } }
+            }]
+          }
         }
-      }]
+      ]
     }
   };
 
@@ -147,7 +165,33 @@ async function deployToK8s(deployment, imageName, onLog) {
     onLog(`🛤️  Created Ingress: ${hostname}`);
   }
 
-  return { k8sName: name, namespace: NAMESPACE, servicePort: 80, hostname };
+  onLog("⏳ Waiting for Cloudflare Tunnel URL...");
+  const publicUrl = await getCloudflareUrl(name, onLog);
+
+  return { k8sName: name, namespace: NAMESPACE, servicePort: 80, hostname, publicUrl };
+}
+
+async function getCloudflareUrl(name, onLog) {
+  for (let i = 0; i < 20; i++) {
+    try {
+      const pods = await k8sCore.listNamespacedPod(NAMESPACE, undefined, undefined, undefined, undefined, `app=${name}`);
+      const pod = pods.body.items.find(p => p.status.phase === "Running");
+      if (pod) {
+        const logs = await k8sCore.readNamespacedPodLog(pod.metadata.name, NAMESPACE, "tunnel");
+        const match = logs.body.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+        if (match) {
+          const url = match[0];
+          onLog(`🌐 Public URL generated: ${url}`);
+          return url;
+        }
+      }
+    } catch (e) {
+      // Ignore log errors until container is ready
+    }
+    await new Promise(r => setTimeout(r, 3000));
+    if (i % 5 === 0) onLog("... still waiting for tunnel assignment ...");
+  }
+  return null;
 }
 
 async function getPodStatus(name) {

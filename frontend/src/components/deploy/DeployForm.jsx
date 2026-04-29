@@ -8,7 +8,7 @@ export default function DeployForm() {
   const navigate = useNavigate();
   const { mutate: createDeployment, isPending } = useCreateDeployment();
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [form, setForm] = useState({ repoUrl: "", branch: "main", replicas: 1, projectName: "", envVars: [] });
+  const [form, setForm] = useState({ repoUrl: "", branch: "", replicas: 1, projectName: "", envVars: [] });
   const [errors, setErrors] = useState({});
 
   const validate = () => {
