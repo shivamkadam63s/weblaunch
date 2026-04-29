@@ -127,7 +127,9 @@ async function buildImage(deployment, onLog) {
   try {
     onLog(`📥 Cloning repository: ${repoUrl}`);
     const git = simpleGit();
-    await git.clone(repoUrl, tmpDir, ["--depth", "1", "--branch", branch || "main"]);
+    const cloneOptions = ["--depth", "1"];
+    if (branch) cloneOptions.push("--branch", branch);
+    await git.clone(repoUrl, tmpDir, cloneOptions);
 
     // Write generated Dockerfile if user has none
     if (!hasDockerfile) {

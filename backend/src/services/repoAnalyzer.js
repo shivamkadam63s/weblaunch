@@ -25,12 +25,14 @@ const DETECTION_RULES = [
   { name:"Static HTML",   stack:"static",  framework:"static",     check:(f,p,r)=>f.includes("index.html")||f.some(x=>x.endsWith(".html")),                                  buildCmd:null,                                                          startCmd:"npx serve -l 3000",                           port:3000 },
 ];
 
-async function analyzeRepository(repoUrl, branch = "main") {
+async function analyzeRepository(repoUrl, branch) {
   const tmpDir = path.join(os.tmpdir(), `weblaunch-analyze-${uuidv4()}`);
   try {
-    logger.info(`Cloning ${repoUrl}@${branch}`);
+    logger.info(`Cloning ${repoUrl}${branch ? `@${branch}` : ''}`);
     const git = simpleGit();
-    await git.clone(repoUrl, tmpDir, ["--depth", "1", "--branch", branch]);
+    const cloneOptions = ["--depth", "1"];
+    if (branch) cloneOptions.push("--branch", branch);
+    await git.clone(repoUrl, tmpDir, cloneOptions);
     const files = await getAllFiles(tmpDir);
     const relFiles = files.map(f => path.relative(tmpDir, f).replace(/\\/g, "/"));
     let pkg = null;
