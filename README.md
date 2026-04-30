@@ -1,92 +1,410 @@
-# WebLaunch - Automated Website Deployment Platform
+<div align="center">
+  <img src="https://raw.githubusercontent.com/ShivamKadam63s/WebLaunch/main/frontend/public/logo.png" alt="WebLaunch Logo" width="200" onerror="this.src='https://via.placeholder.com/200?text=WebLaunch'"/>
+  <h1>🚀 WebLaunch</h1>
+  <p><strong>The Fully Automated, Zero-Config Website Deployment & Orchestration Platform</strong></p>
+  
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+  [![Node.js](https://img.shields.io/badge/Node.js-43853D?style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
+  [![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+  [![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+  [![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat&logo=grafana&logoColor=white)](https://grafana.com/)
+  [![SonarQube](https://img.shields.io/badge/SonarQube-4E9BCD?style=flat&logo=sonarqube&logoColor=white)](https://www.sonarqube.org/)
 
-![WebLaunch Architecture & Dashboard]
-WebLaunch is an end-to-end automated deployment platform designed to simplify the hosting and orchestration of web applications. It provides a seamless, "one-click" pipeline from GitHub repositories to a live, accessible Kubernetes environment, completely running locally using a unified Docker Compose stack.
-
-## System Architecture
-
-The WebLaunch platform is designed using a microservices-inspired architecture. The core components run as individual containers orchestrated by a root `docker-compose.yml` file.
-
-1.  **Frontend Dashboard**: A React-based interface for users to submit repositories, view deployment statuses, and read logs.
-2.  **Backend Orchestrator**: A Node.js API that handles Git cloning, container building, and Kubernetes manifest generation.
-3.  **Task Queue**: Redis and Bull manage asynchronous, long-running deployment jobs.
-4.  **Local Image Registry**: A local Docker registry (`registry:2`) acts as a bridge. The backend pushes built images here, and Kubernetes pulls from it.
-5.  **Kubernetes Cluster (K3s)**: A lightweight K8s cluster running *inside* a Docker container, used to deploy and expose user applications.
-6.  **Monitoring & Telemetry**: Prometheus scrapes metrics from Node Exporter (host) and cAdvisor (containers), which are visualized via Grafana.
-7.  **Code Quality**: Integrated SonarQube pipeline for analyzing submitted codebases.
+</div>
 
 ---
 
-## Technology Stack: Theoretical & Practical Working
-
-### 1. Frontend: React, Vite, Tailwind CSS
-*   **Theoretical Perspective**: React utilizes a virtual DOM for efficient, declarative UI updates. Vite is a next-generation frontend build tool providing exceptionally fast Hot Module Replacement (HMR) during development and optimized rollups for production. Tailwind is a utility-first CSS framework enabling rapid, constraint-based styling directly within component markup.
-*   **Practical Working**: The frontend is a Single Page Application (SPA) served by Nginx (when built). It communicates with the backend via REST API calls (Axios) for CRUD operations and relies on WebSockets (`socket.io-client`) to stream real-time logs and deployment status updates. It visualizes data using Recharts and manages state via React Query and standard hooks.
-
-### 2. Backend API: Node.js, Express, Dockerode, K8s Client
-*   **Theoretical Perspective**: Node.js offers an asynchronous, event-driven architecture, ideal for I/O-heavy operations like interacting with APIs, file systems, and databases. Express is a minimal routing framework.
-*   **Practical Working**: The backend is the core engine. When a deployment is requested:
-    1.  It clones the GitHub repository (`simple-git`).
-    2.  It inspects the repository structure to detect the application stack (e.g., Node.js, static HTML).
-    3.  It generates a tailored `Dockerfile` dynamically.
-    4.  It communicates with the host's Docker daemon via `/var/run/docker.sock` using `dockerode` to build the image.
-    5.  It tags and pushes the image to the local `registry`.
-    6.  It uses `@kubernetes/client-node` to generate and apply K8s Deployments, Services, and Ingress manifests to the K3s cluster.
-
-### 3. Orchestration & Containerization: Docker & K3s
-*   **Theoretical Perspective**: Containerization (Docker) isolates applications and their dependencies into immutable units. Kubernetes is a container orchestration engine for automating deployment, scaling, and management. K3s is a CNCF-certified, stripped-down version of Kubernetes designed for edge computing and local environments.
-*   **Practical Working**: Instead of requiring a standalone Minikube installation, WebLaunch runs `rancher/k3s` directly as a service in the `docker-compose` stack. The K3s container runs in privileged mode and shares the docker socket. It reads from the `registry:5000` to pull newly built user applications. Traefik (bundled with K3s) acts as the Ingress controller, routing traffic from `.localhost` hostnames directly to the deployed pods.
-
-### 4. Job Queue & State: Redis & Bull
-*   **Theoretical Perspective**: Redis is an advanced, in-memory key-value data store used for caching and message brokering. Bull is a robust queue system built on top of Redis, handling distributed, asynchronous job processing.
-*   **Practical Working**: Building Docker images and provisioning Kubernetes resources are blocking operations that can take minutes. To keep the API responsive, the Node.js backend pushes deployment tasks to a Bull queue. Worker processes pick up these jobs, process them in the background, and emit state changes via WebSockets.
-
-### 5. Monitoring & Telemetry: Prometheus, Grafana, cAdvisor, Node Exporter
-*   **Theoretical Perspective**: Prometheus is a time-series database that uses a pull model to gather metrics. Grafana is a powerful observability platform for creating visual dashboards. cAdvisor provides container-level usage data, while Node Exporter provides machine-level hardware metrics.
-*   **Practical Working**: WebLaunch includes a built-in observability stack. Prometheus scrapes the `/metrics` endpoints of the Node Exporter and cAdvisor. Grafana is configured with pre-provisioned data sources and dashboards (like `platform.json` and `deployments.json`). Users can instantly monitor CPU, memory, and network usage of both the host system and the deployed Kubernetes pods without any manual setup.
-
-### 6. Code Quality Analysis: SonarQube
-*   **Theoretical Perspective**: SonarQube is a static application security testing (SAST) and code quality platform that detects bugs, vulnerabilities, and code smells continuously.
-*   **Practical Working**: WebLaunch features a non-blocking integration with a SonarQube scanner. During the deployment pipeline, a parallel job uses `sonar-scanner` to analyze the cloned repository. The results are stored (via `pgClient`) and surfaced in the frontend `CodeQuality.jsx` dashboard, allowing developers to review code health alongside their deployments.
+## 📖 Table of Contents
+1. [Introduction & Problem Statement](#-introduction--problem-statement)
+2. [High-Level Architecture](#-high-level-architecture)
+3. [The Deployment Lifecycle (Sequence Flow)](#-the-deployment-lifecycle-sequence-flow)
+4. [Theoretical Foundation & Engineering Principles](#-theoretical-foundation--engineering-principles)
+5. [Deep Dive: Technology Stack Analysis](#-deep-dive-technology-stack-analysis)
+    * [Frontend Presentation Layer](#1-frontend-presentation-layer)
+    * [Backend Orchestration API](#2-backend-orchestration-api)
+    * [Asynchronous Task Queue](#3-asynchronous-task-queue--state-management)
+    * [Containerization & Kubernetes (K3s)](#4-containerization--kubernetes-k3s-orchestration)
+    * [Observability & Telemetry](#5-observability--telemetry-stack)
+    * [Code Quality & Static Analysis](#6-code-quality--static-analysis-pipeline)
+6. [Security Architecture](#-security-architecture)
+7. [Directory Structure](#-directory-structure)
+8. [Comprehensive Setup & Installation Guide](#-comprehensive-setup--installation-guide)
+9. [Detailed Usage & Workflows](#-detailed-usage--workflows)
+10. [Troubleshooting Guide](#-troubleshooting-guide)
+11. [Roadmap & Future Enhancements](#-roadmap--future-enhancements)
+12. [License & Acknowledgements](#-license--acknowledgements)
 
 ---
 
-## Setup & Installation
+## 🌟 Introduction & Problem Statement
+
+### The Problem
+Modern web deployment is overly complex. Developers wanting to quickly host a full-stack application, a React frontend, or a simple Node.js server are forced to navigate a labyrinth of tools: configuring Dockerfiles, setting up cloud infrastructure (AWS/GCP), managing Kubernetes manifests, dealing with CI/CD pipelines, configuring Ingress controllers, and setting up monitoring. This creates a massive barrier to entry and slows down the feedback loop for developers who just want to see their code live.
+
+### The Solution: WebLaunch
+**WebLaunch** is a monolithic-in-deployment, microservices-in-architecture platform designed to act as your personal Platform as a Service (PaaS). It abstracts away the entire infrastructure layer. You provide a public GitHub URL, and WebLaunch handles the rest: 
+1. Source code cloning
+2. Stack detection (Node, React, Static, etc.)
+3. Dynamic Docker image building
+4. Local Registry push
+5. Kubernetes manifest generation (Deployments, Services, Ingress)
+6. Live application routing via local domains
+7. Comprehensive code quality scanning (SonarQube)
+
+All of this happens locally, orchestrated by a single, powerful `docker-compose.yml` file, giving you a production-grade Kubernetes environment right on your laptop without the overhead of Minikube or external cloud costs.
+
+---
+
+## 🏛️ High-Level Architecture
+
+WebLaunch uses a modular microservices architecture, entirely containerized.
+
+```mermaid
+graph TD
+    User([👨‍💻 User]) -->|Access Dashboard| Frontend[🖥️ React + Vite Frontend]
+    Frontend <-->|REST API / WebSockets| Backend[⚙️ Node.js Express API]
+    
+    subgraph "Job Queue & State"
+        Backend -->|Add Job| Redis[(💾 Redis)]
+        Redis -->|Process Job| Worker[👷 Bull Queue Worker]
+    end
+
+    subgraph "Orchestration & Compute"
+        Worker -->|1. Clone & Build| DockerDaemon[🐳 Host Docker Daemon]
+        Worker -->|2. Push Image| Registry[📦 Local Registry :5000]
+        Worker -->|3. Apply Manifests| K3s[☸️ K3s Kubernetes Cluster]
+        K3s -->|Pull Image| Registry
+    end
+
+    subgraph "Observability & Quality"
+        Worker -->|Analyze Code| Sonar[🔍 SonarQube Scanner]
+        Sonar -->|Save Results| DB[(🐘 PostgreSQL)]
+        Prometheus[📈 Prometheus] -->|Scrape Metrics| Backend
+        Prometheus -->|Scrape Metrics| NodeExporter[📊 Node Exporter]
+        Prometheus -->|Scrape Metrics| cAdvisor[📦 cAdvisor]
+        Grafana[📊 Grafana Dashboard] -->|Query| Prometheus
+    end
+
+    K3s -->|Serve App| User
+```
+
+---
+
+## 🔄 The Deployment Lifecycle (Sequence Flow)
+
+Understanding how a repository turns into a live URL is critical. Here is the step-by-step sequence of the WebLaunch engine:
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Frontend
+    participant API as Backend API
+    participant Queue as Redis/Bull
+    participant Worker as Deployment Worker
+    participant Docker as Docker Daemon
+    participant Reg as Local Registry
+    participant K3s as K3s Cluster
+    participant Sonar as SonarQube Scanner
+
+    User->>Frontend: Submits GitHub URL
+    Frontend->>API: POST /api/deploy {repoUrl}
+    API->>Queue: Add Deployment Job
+    API-->>Frontend: Returns Job ID & Status (Pending)
+    
+    Queue->>Worker: Consume Job
+    Worker->>Frontend: Emit WS: "Cloning Repository"
+    Worker->>Worker: git clone {repoUrl}
+    
+    par Quality Pipeline
+        Worker->>Sonar: Trigger Sonar Scanner
+        Sonar->>Sonar: Analyze Codebase
+        Sonar->>API: Webhook/Save Results
+    and Deployment Pipeline
+        Worker->>Worker: Detect Stack & Generate Dockerfile
+        Worker->>Frontend: Emit WS: "Building Image"
+        Worker->>Docker: docker build -t {appName}
+        Docker-->>Worker: Image Built
+        
+        Worker->>Frontend: Emit WS: "Pushing to Registry"
+        Worker->>Docker: docker tag & push localhost:5000/{appName}
+        Docker->>Reg: Save Image
+        
+        Worker->>Frontend: Emit WS: "Deploying to Kubernetes"
+        Worker->>Worker: Generate Deployment, Service, Ingress YAML
+        Worker->>K3s: Apply manifests (@kubernetes/client-node)
+        K3s->>Reg: Pull Image
+        K3s-->>K3s: Start Pods & Configure Traefik Routing
+    end
+    
+    Worker->>Frontend: Emit WS: "Deployment Complete"
+    Frontend-->>User: Display Live URL (http://{app}.localhost)
+```
+
+---
+
+## 🧠 Theoretical Foundation & Engineering Principles
+
+WebLaunch is built upon several core software engineering and DevOps principles:
+
+1. **Infrastructure as Code (IaC) & Configuration as Data**: 
+   The entire platform is defined in a single `docker-compose.yml`. This ensures idempotency; the environment is identical regardless of the host machine. Kubernetes manifests are dynamically generated as JavaScript objects (JSON/YAML) and applied programmatically, eliminating manual `kubectl` errors.
+
+2. **Event-Driven Architecture (EDA)**:
+   The user interface is entirely reactive. Long-polling is avoided in favor of WebSockets. When the backend worker shifts states (e.g., from `Building` to `Deploying`), it emits real-time events. This decouples the client from the server's processing limitations.
+
+3. **Asynchronous Non-Blocking Processing**:
+   Node.js is single-threaded. Building a Docker image can freeze the event loop. WebLaunch offloads these intensive tasks to a separate worker process managed by Bull and Redis, ensuring the main API remains highly available for incoming requests.
+
+4. **Container Orchestration vs. Containerization**:
+   While Docker containerizes the application, K3s (Kubernetes) orchestrates it. K3s handles the declarative state—if a user's deployed pod crashes, K3s automatically restarts it based on the `ReplicaSet` configuration. It also provides built-in load balancing (Traefik Ingress).
+
+5. **Shift-Left Security & Quality**:
+   By integrating SonarQube directly into the deployment pipeline, code quality checks happen *before* the application goes live, enforcing a proactive approach to technical debt and security vulnerabilities.
+
+---
+
+## 🔍 Deep Dive: Technology Stack Analysis
+
+This section explores the technologies used in WebLaunch, detailing both *why* they were chosen (theoretical) and *how* they are implemented (practical).
+
+### 1. Frontend Presentation Layer
+**Technologies:** React 18, Vite, Tailwind CSS, Lucide React, Recharts, Socket.IO Client.
+
+*   **Theoretical Perspective:**
+    React's virtual DOM reconciliation algorithm allows for highly efficient updates, which is crucial when streaming hundreds of lines of build logs per second. Vite replaces traditional bundlers like Webpack by leveraging native ES modules in the browser, offering sub-second Hot Module Replacement (HMR). Tailwind CSS shifts styling from separate CSS files to utility classes directly in the markup, reducing context switching and enforcing a strict design system.
+*   **Practical Implementation:**
+    *   **Architecture:** The frontend is organized by `pages/` (Dashboard, Settings, CodeQuality) and `components/` (Cards, Modals, Terminal).
+    *   **State Management:** React Context and standard hooks (`useState`, `useEffect`) manage local state, while `@tanstack/react-query` handles caching and synchronization of server data (fetching deployment lists).
+    *   **Real-time Logs:** The `Socket.IO` client connects to the backend namespace. It listens for `log` and `status-update` events, appending them to a custom "Terminal" component that auto-scrolls, providing a Vercel-like build experience.
+
+### 2. Backend Orchestration API
+**Technologies:** Node.js (v18+), Express, Dockerode, @kubernetes/client-node, simple-git.
+
+*   **Theoretical Perspective:**
+    Node.js's non-blocking I/O is perfectly suited for an orchestrator that spends most of its time waiting for other systems (Docker daemon, Kubernetes API, GitHub). `Dockerode` is a pure JavaScript client for the Docker Remote API, eliminating the need to execute shell scripts. The Kubernetes client allows programmatic, type-safe interaction with the K8s API server.
+*   **Practical Implementation:**
+    *   **Git Operations:** Uses `simple-git` to clone repositories into a temporary workspace (`/tmp/deployments`).
+    *   **Stack Detection:** The backend analyzes the `package.json` (for Node/React apps) or `index.html` (for static sites) to determine the build context.
+    *   **Dockerode:** It creates a tarball of the workspace and streams it via Unix socket (`/var/run/docker.sock`) to the Docker daemon to build the image. It streams the `stdout` back to the client via WebSockets.
+    *   **K8s Manifest Generation:** Uses JavaScript objects to construct K8s `Deployment`, `Service`, and `Ingress` YAML definitions dynamically, injecting the correct image names and port mappings, then applies them using `k8sApi.replaceNamespacedDeployment` or `createNamespacedDeployment`.
+
+### 3. Asynchronous Task Queue & State Management
+**Technologies:** Redis, Bull.
+
+*   **Theoretical Perspective:**
+    A message broker is essential for distributed systems. Redis is an in-memory data store providing sub-millisecond read/write speeds. Bull is a Node.js library that implements a robust queue system on top of Redis, providing job persistence, retries, concurrency control, and delayed execution.
+*   **Practical Implementation:**
+    When a user clicks "Deploy", the Express route handler immediately responds with `202 Accepted` and a Job ID. Under the hood, it pushes the data ` { repoUrl, branch }` to a Bull queue named `deployments`. A separate worker file (`deploymentWorker.js`) processes jobs from this queue one at a time. Redis also acts as the pub/sub backplane for Socket.IO, allowing real-time event broadcasting across multiple instances if the backend were to scale.
+
+### 4. Containerization & Kubernetes (K3s) Orchestration
+**Technologies:** Docker, K3s (Rancher), Local Docker Registry.
+
+*   **Theoretical Perspective:**
+    Kubernetes is traditionally heavy, requiring significant RAM and CPU just for the control plane. K3s strips out legacy, alpha, and non-default features, substituting etcd with SQLite, resulting in a single binary under 100MB. It's the perfect Kubernetes distribution for local development and CI pipelines.
+*   **Practical Implementation:**
+    *   **K3s in Docker (K3d paradigm):** The `docker-compose.yml` runs the `rancher/k3s` image in privileged mode. It exposes the Kubeconfig file to a shared volume so the Node.js backend can authenticate.
+    *   **The Registry Bridge:** Kubernetes cannot directly pull images from the host's local Docker cache. Therefore, a `registry:2` container runs on port 5000. The backend builds the image, tags it as `localhost:5000/app-name`, and pushes it. K3s is configured via `/etc/rancher/k3s/registries.yaml` to trust this insecure local registry and pull images from it.
+    *   **Routing:** K3s comes bundled with Traefik. The backend generates an Ingress route for `Host(\`app-name.localhost\`)`, routing host traffic on port 80 directly to the pod.
+
+### 5. Observability & Telemetry Stack
+**Technologies:** Prometheus, Grafana, Node Exporter, cAdvisor.
+
+*   **Theoretical Perspective:**
+    You cannot manage what you cannot measure. Observability comprises Metrics, Logs, and Traces. Prometheus handles metrics via a pull-based model (scraping `/metrics` endpoints). Grafana provides the visualization layer.
+*   **Practical Implementation:**
+    *   **Node Exporter:** Runs as a container with host filesystem mounts (`/proc`, `/sys`) to report host CPU, RAM, and Disk I/O.
+    *   **cAdvisor:** Interacts with the Docker daemon to report resource usage for *every running container*, including the K3s pods.
+    *   **Prometheus:** Scrapes these targets every 15 seconds.
+    *   **Grafana:** Pre-provisioned via volumes with data sources (Prometheus) and dashboards (`platform.json`, `deployments.json`). Users can instantly see the CPU usage of their dynamically deployed GitHub repositories.
+
+### 6. Code Quality & Static Analysis Pipeline
+**Technologies:** SonarQube Scanner, PostgreSQL.
+
+*   **Theoretical Perspective:**
+    Continuous Inspection ensures code quality does not degrade over time. SonarQube analyzes code for bugs, vulnerabilities, security hotspots, and code smells.
+*   **Practical Implementation:**
+    To prevent deployment bottlenecks, the SonarQube pipeline is **non-blocking**. While the Docker image is building, a parallel process runs the `sonar-scanner` CLI tool against the cloned repository. The results (Quality Gate status, bugs, vulnerabilities) are fetched via the SonarQube API, stored in a local PostgreSQL database via the `pgClient` service, and displayed on the frontend `CodeQuality.jsx` page.
+
+---
+
+## 🛡️ Security Architecture
+
+While designed for local development, WebLaunch incorporates several security best practices:
+*   **Principle of Least Privilege:** The Node.js backend does not run as root. It only has access to the specific volumes required (logs, temporary deployment directories).
+*   **Namespace Isolation:** All user applications are deployed into a specific Kubernetes namespace (e.g., `weblaunch-apps`), isolating them from the `kube-system` resources.
+*   **Secret Management:** Environment variables (like database passwords or API keys) are managed via `.env` files and not hardcoded.
+*   **Helmet.js:** The Express backend uses Helmet to set secure HTTP headers (XSS protection, preventing clickjacking).
+*   **Rate Limiting:** `express-rate-limit` prevents abuse of the deployment endpoints.
+
+---
+
+## 📁 Directory Structure
+
+```text
+WebLaunch/
+├── docker-compose.yml       # The master orchestrator for the platform
+├── .env                     # Environment variables configuration
+├── .gitignore               # Git ignore rules
+├── README.md                # This comprehensive documentation
+│
+├── frontend/                # React Vite Frontend Application
+│   ├── Dockerfile           # Frontend container definition
+│   ├── package.json         # Node dependencies
+│   ├── tailwind.config.js   # Tailwind CSS configuration
+│   ├── vite.config.js       # Vite bundler configuration
+│   └── src/
+│       ├── App.jsx          # Main application component & routing
+│       ├── main.jsx         # React entry point
+│       ├── components/      # Reusable UI components (Cards, Layout)
+│       ├── pages/           # Route pages (Dashboard, CodeQuality)
+│       └── utils/           # Helper functions
+│
+├── backend/                 # Node.js Express Backend API
+│   ├── Dockerfile           # Backend container definition
+│   ├── package.json         # Node dependencies
+│   └── src/
+│       ├── index.js         # Entry point, Express setup, Socket.IO init
+│       ├── routes/          # API endpoint controllers (deploy.js, sonar.js)
+│       ├── services/        # Core business logic
+│       │   ├── dockerBuilder.js # Dockerode interaction logic
+│       │   ├── k8sClient.js     # Kubernetes API interaction
+│       │   ├── sonarScanner.js  # SonarQube analysis logic
+│       │   ├── pgClient.js      # PostgreSQL database interactions
+│       │   └── deploymentWorker.js # Bull queue processor
+│       └── utils/           # Helper functions (logger, file system)
+│
+└── monitoring/              # Observability Configuration
+    ├── prometheus/
+    │   └── prometheus.yml   # Prometheus scraping targets
+    └── grafana/
+        ├── provisioning/    # Auto-setup data sources
+        └── dashboards/      # Pre-built JSON dashboards
+```
+
+---
+
+## 🚀 Comprehensive Setup & Installation Guide
+
+WebLaunch is engineered to be a "Zero-Config" environment. You do not need to install Node.js, Kubernetes, or Redis on your host machine. Everything runs through Docker.
 
 ### Prerequisites
-*   Windows/Linux/macOS with **Docker Desktop** (or Docker Engine) installed and running.
-*   Node.js (v18+) for local development (optional, as everything runs in Docker).
-*   Ensure ports `80`, `443`, `3000`, `3001`, `3002`, `4000`, `5000`, `6379`, `6443`, `8080`, `9090`, and `9100` are available on your host.
+1.  **OS:** Windows 10/11 (with WSL2), macOS, or Linux.
+2.  **Docker:** Docker Desktop or Docker Engine installed and running.
+3.  **Ports:** Ensure the following ports are NOT in use on your host machine:
+    *   `80` / `443` (Traefik Ingress / User Apps)
+    *   `3002` (Frontend Dashboard)
+    *   `4000` (Backend API)
+    *   `5000` (Local Registry)
+    *   `6379` (Redis)
+    *   `6443` (K3s Kubernetes API)
+    *   `3001` (Grafana)
+    *   `9090` (Prometheus)
 
-### Quick Start (Automated Environment)
-The entire platform is orchestrated via Docker Compose, eliminating the need to install Kubernetes or internal tools locally.
+### Installation Steps
 
-1.  **Clone the WebLaunch repository:**
+1.  **Clone the Repository:**
+    Open your terminal and clone the repository to your local machine.
     ```bash
     git clone https://github.com/ShivamKadam63s/WebLaunch.git
     cd WebLaunch
     ```
 
-2.  **Start the entire platform stack:**
+2.  **Environment Variables (Optional):**
+    The system is configured to work out-of-the-box using default values in `docker-compose.yml`. You may create an `.env` file in the root directory to override specific ports or database passwords if needed.
+
+3.  **Start the Platform:**
+    Execute the following command in the root directory. This will pull all necessary base images, build the WebLaunch frontend and backend, and start the entire orchestration, queueing, and monitoring stack.
     ```bash
     docker-compose up --build -d
     ```
-    *This command will build the frontend, backend, and spin up K3s, Redis, the Registry, Prometheus, and Grafana in the background.*
+    *(Note: The initial build may take 3-5 minutes as it downloads K3s, Redis, Prometheus, Grafana, and compiles the React application).*
 
-3.  **Access the Platform:**
-    *   **Frontend Dashboard:** `http://localhost:3002`
-    *   **Backend API:** `http://localhost:4000`
-    *   **Grafana Dashboards:** `http://localhost:3001` (No login required)
-    *   **Prometheus:** `http://localhost:9090`
+4.  **Verify the System:**
+    Check that all containers are running successfully:
+    ```bash
+    docker-compose ps
+    ```
+    You should see containers for `frontend`, `backend`, `k3s`, `registry`, `redis`, `prometheus`, `grafana`, `node-exporter`, and `cadvisor` in the `Up` state.
 
-### Deploying a Repository
-1. Navigate to the Frontend Dashboard (`http://localhost:3002`).
-2. Enter the URL of a public GitHub repository (e.g., a React app, an Express server, or a static website).
-3. WebLaunch will automatically detect the stack, build the container, deploy it to the internal K3s cluster, and provide you with a live `.localhost` URL to view your application!
+---
 
-## Branching & Contribution
-*   **`main` branch**: Contains the stable release and the combined Docker Compose architecture.
-*   **Feature branches** (e.g., `code-quality`): Contain active development for specific modules.
+## 💻 Detailed Usage & Workflows
 
-## License
-MIT License
+Once the system is running, you can access the various interfaces and begin deploying applications.
+
+### 1. Accessing the Platform Hubs
+Open your web browser and navigate to:
+*   **🎛️ WebLaunch Dashboard (Frontend):** `http://localhost:3002`
+*   **📊 Grafana Monitoring:** `http://localhost:3001` *(No login required, anonymous access enabled)*
+*   **📈 Prometheus Metrics:** `http://localhost:9090`
+
+### 2. Deploying Your First Application
+1.  Go to the Frontend Dashboard (`http://localhost:3002`).
+2.  In the deployment input field, paste the URL of a public GitHub repository. 
+    *Example: `https://github.com/bradtraversy/design-resources-for-developers` (Static HTML) or a Node.js Express app.*
+3.  Click **Deploy**.
+4.  **Watch the Magic:** The real-time terminal will appear. You will see the system:
+    *   Initialize the job in the Redis queue.
+    *   Clone the repository locally.
+    *   Detect the framework and generate a Dockerfile.
+    *   Stream the `docker build` logs.
+    *   Push to the local registry.
+    *   Generate and apply Kubernetes manifests.
+5.  **Access Your App:** Once deployment is complete, the dashboard will provide a clickable URL, formatted as `http://{repo-name}.localhost`. Click it to view your live, orchestrated application!
+
+### 3. Reviewing Code Quality
+1.  After a deployment completes, navigate to the **Code Quality** tab in the frontend.
+2.  The system will display a comprehensive SonarQube analysis of your deployed repository, highlighting:
+    *   Quality Gate Status (Pass/Fail)
+    *   Total Bugs and Vulnerabilities
+    *   Code Smells and Debt Ratio
+    *   Duplication percentage.
+
+### 4. Monitoring the Infrastructure
+1.  Navigate to Grafana (`http://localhost:3001`).
+2.  Open the **WebLaunch Platform** dashboard.
+3.  Here you can monitor the real-time resource consumption (CPU, Memory, Network TX/RX) of the underlying K3s cluster, the Redis queue length, and the performance of your dynamically deployed user applications.
+
+---
+
+## 🛠️ Troubleshooting Guide
+
+If you encounter issues, here are common solutions:
+
+*   **Error: "Port is already allocated"**
+    *   *Cause:* Another service on your machine (like local Postgres, Apache, or another Docker container) is using a required port (e.g., 80, 5000).
+    *   *Solution:* Stop the conflicting service, or modify the port mapping in `docker-compose.yml`.
+*   **Error: K3s fails to start / Kubernetes API unreachable**
+    *   *Cause:* Docker may not have enough resources allocated, or there's a conflict with the Docker socket volume mount.
+    *   *Solution:* Ensure Docker Desktop is allocated at least 4GB of RAM and 2 CPUs. Restart Docker daemon.
+*   **Deployment gets stuck on "Building Image"**
+    *   *Cause:* The generated Dockerfile might be failing to build due to missing dependencies in the user's repository (e.g., `npm install` failing).
+    *   *Solution:* Check the real-time terminal logs in the UI. You can also view backend logs directly via `docker-compose logs -f backend`.
+*   **Cannot access `http://appname.localhost`**
+    *   *Cause:* Your browser or OS might not resolve `.localhost` domains to `127.0.0.1` automatically.
+    *   *Solution:* Most modern browsers (Chrome, Edge) support this natively. If using Firefox, you may need to adjust `network.dns.localDomains`. Alternatively, add an entry to your OS `hosts` file: `127.0.0.1 appname.localhost`.
+
+---
+
+## 🗺️ Roadmap & Future Enhancements
+
+WebLaunch is continuously evolving. Planned features include:
+
+*   **[ ] Private Repository Support:** Integration with GitHub OAuth to allow users to deploy private repositories securely.
+*   **[ ] Advanced Stack Detection:** Support for Python (Django/Flask), Go, and Rust applications.
+*   **[ ] Custom Domain Mapping:** Allow users to map custom domains (e.g., `myapp.com`) instead of just `.localhost` routing.
+*   **[ ] Persistent Storage:** Automatically provision Persistent Volume Claims (PVCs) for applications that require databases (e.g., WordPress).
+*   **[ ] Distributed Architecture:** Refactor the deployment worker to run as a scalable Kubernetes deployment rather than a standalone Docker container.
+*   **[ ] Environment Variable Management:** Add a UI to securely inject custom environment variables into deployed pods.
+
+---
+
+## 📄 License & Acknowledgements
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+Developed with ❤️ as a comprehensive exploration of DevOps, Container Orchestration, and Automated CI/CD pipelines.
+
+---
+*End of Documentation. WebLaunch - Automating the web, one container at a time.*
