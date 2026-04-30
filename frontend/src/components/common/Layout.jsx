@@ -1,6 +1,6 @@
 import React from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Rocket, Activity, Github, Menu, X } from "lucide-react";
+import { LayoutDashboard, Rocket, Activity, Github, Menu, X, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import clsx from "clsx";
 
@@ -8,6 +8,7 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard",  icon: LayoutDashboard },
   { to: "/deploy",    label: "Deploy",      icon: Rocket },
   { to: "/monitoring",label: "Monitoring",  icon: Activity },
+  { to: "/code-quality",label: "Code Quality", icon: ShieldCheck },
 ];
 
 export default function Layout() {

@@ -14,6 +14,7 @@ const statusRoutes = require("./routes/status");
 const logsRoutes = require("./routes/logs");
 const { router: metricsRouter } = require("./routes/metrics");
 const { initRedis } = require("./services/redisClient");
+const { initDb } = require("./services/pgClient");
 const { initDeploymentWorker } = require("./services/deploymentWorker");
 const { errorHandler } = require("./middleware/errorHandler");
 const { authMiddleware } = require("./middleware/auth");
@@ -67,6 +68,7 @@ app.get("/health", (req, res) =>
 app.use("/api/deployments", deployRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/logs", logsRoutes);
+app.use("/api/code-quality", require("./routes/sonar"));
 app.use("/metrics", metricsRouter);
 
 // 404 handler
@@ -98,6 +100,8 @@ const PORT = process.env.PORT || 4000;
 
 async function bootstrap() {
   try {
+    await initDb();
+    
     await initRedis();
     logger.info("Redis connected");
 

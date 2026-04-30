@@ -20,6 +20,10 @@ volumes:
   grafana-data:
   k3s-data:
   k3s-config:
+  postgres-data:
+  sonarqube-data:
+  sonarqube-extensions:
+  sonarqube-logs:
 
 services:
 
@@ -131,6 +135,61 @@ services:
     labels:
       <<: *labels
       com.weblaunch.service: "registry"
+
+  # ── PostgreSQL (for backend + SonarQube) ───────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: weblaunch-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=weblaunch
+      - POSTGRES_PASSWORD=weblaunch_secret
+      - POSTGRES_DB=weblaunch
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - weblaunch-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weblaunch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      <<: *labels
+      com.weblaunch.service: "postgres"
+
+  # ── SonarQube ──────────────────────────────────────────────
+  sonarqube:
+    image: sonarqube:10-community
+    container_name: weblaunch-sonarqube
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://postgres:5432/weblaunch
+      - SONAR_JDBC_USERNAME=weblaunch
+      - SONAR_JDBC_PASSWORD=weblaunch_secret
+      - SONAR_WEB_JAVAADDITIONALOPTS=-server
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+    networks:
+      - weblaunch-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    labels:
+      <<: *labels
+      com.weblaunch.service: "sonarqube"
 
   # ── Redis (Job Queue + Store) ──────────────────────────────
   redis:

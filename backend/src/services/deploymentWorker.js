@@ -2,6 +2,7 @@ const { deploymentQueue } = require("./deploymentQueue");
 const { buildImage } = require("./dockerBuilder");
 const { deployToK8s } = require("./k8sManager");
 const { saveDeployment, updateDeployment, appendLog } = require("./deploymentStore");
+const { runSonarScan } = require("./sonarScanner");
 const logger = require("../utils/logger");
 
 async function initDeploymentWorker(io) {
@@ -24,6 +25,12 @@ async function initDeploymentWorker(io) {
       // Build Docker image
       const imageName = await buildImage(deployment, (msg) => emit("info", msg));
       await updateDeployment(id, { status: "deploying", imageName });
+
+      // Non-blocking SonarQube Code Quality Scan
+      // We start this asynchronously and let it resolve in the background
+      runSonarScan(deployment).catch(err => {
+        logger.error(`Background SonarQube scan failed for ${id}: ${err.message}`);
+      });
 
       // Deploy to Kubernetes
       emit("info", "☸️  Deploying to Kubernetes...");
