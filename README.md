@@ -9,7 +9,6 @@
   [![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
   [![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
   [![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat&logo=grafana&logoColor=white)](https://grafana.com/)
-  [![SonarQube](https://img.shields.io/badge/SonarQube-4E9BCD?style=flat&logo=sonarqube&logoColor=white)](https://www.sonarqube.org/)
 
 </div>
 
@@ -26,7 +25,6 @@
     * [Asynchronous Task Queue](#3-asynchronous-task-queue--state-management)
     * [Containerization & Kubernetes (K3s)](#4-containerization--kubernetes-k3s-orchestration)
     * [Observability & Telemetry](#5-observability--telemetry-stack)
-    * [Code Quality & Static Analysis](#6-code-quality--static-analysis-pipeline)
 6. [Security Architecture](#-security-architecture)
 7. [Directory Structure](#-directory-structure)
 8. [Comprehensive Setup & Installation Guide](#-comprehensive-setup--installation-guide)
@@ -50,7 +48,6 @@ Modern web deployment is overly complex. Developers wanting to quickly host a fu
 4. Local Registry push
 5. Kubernetes manifest generation (Deployments, Services, Ingress)
 6. Live application routing via local domains
-7. Comprehensive code quality scanning (SonarQube)
 
 All of this happens locally, orchestrated by a single, powerful `docker-compose.yml` file, giving you a production-grade Kubernetes environment right on your laptop without the overhead of Minikube or external cloud costs.
 
@@ -77,9 +74,7 @@ graph TD
         K3s -->|Pull Image| Registry
     end
 
-    subgraph "Observability & Quality"
-        Worker -->|Analyze Code| Sonar[🔍 SonarQube Scanner]
-        Sonar -->|Save Results| DB[(🐘 PostgreSQL)]
+    subgraph "Observability"
         Prometheus[📈 Prometheus] -->|Scrape Metrics| Backend
         Prometheus -->|Scrape Metrics| NodeExporter[📊 Node Exporter]
         Prometheus -->|Scrape Metrics| cAdvisor[📦 cAdvisor]
@@ -105,7 +100,6 @@ sequenceDiagram
     participant Docker as Docker Daemon
     participant Reg as Local Registry
     participant K3s as K3s Cluster
-    participant Sonar as SonarQube Scanner
 
     User->>Frontend: Submits GitHub URL
     Frontend->>API: POST /api/deploy {repoUrl}
@@ -116,13 +110,8 @@ sequenceDiagram
     Worker->>Frontend: Emit WS: "Cloning Repository"
     Worker->>Worker: git clone {repoUrl}
     
-    par Quality Pipeline
-        Worker->>Sonar: Trigger Sonar Scanner
-        Sonar->>Sonar: Analyze Codebase
-        Sonar->>API: Webhook/Save Results
-    and Deployment Pipeline
-        Worker->>Worker: Detect Stack & Generate Dockerfile
-        Worker->>Frontend: Emit WS: "Building Image"
+    Worker->>Worker: Detect Stack & Generate Dockerfile
+    Worker->>Frontend: Emit WS: "Building Image"
         Worker->>Docker: docker build -t {appName}
         Docker-->>Worker: Image Built
         
@@ -135,7 +124,6 @@ sequenceDiagram
         Worker->>K3s: Apply manifests (@kubernetes/client-node)
         K3s->>Reg: Pull Image
         K3s-->>K3s: Start Pods & Configure Traefik Routing
-    end
     
     Worker->>Frontend: Emit WS: "Deployment Complete"
     Frontend-->>User: Display Live URL (http://{app}.localhost)
@@ -158,9 +146,6 @@ WebLaunch is built upon several core software engineering and DevOps principles:
 
 4. **Container Orchestration vs. Containerization**:
    While Docker containerizes the application, K3s (Kubernetes) orchestrates it. K3s handles the declarative state—if a user's deployed pod crashes, K3s automatically restarts it based on the `ReplicaSet` configuration. It also provides built-in load balancing (Traefik Ingress).
-
-5. **Shift-Left Security & Quality**:
-   By integrating SonarQube directly into the deployment pipeline, code quality checks happen *before* the application goes live, enforcing a proactive approach to technical debt and security vulnerabilities.
 
 ---
 
@@ -218,14 +203,6 @@ This section explores the technologies used in WebLaunch, detailing both *why* t
     *   **Prometheus:** Scrapes these targets every 15 seconds.
     *   **Grafana:** Pre-provisioned via volumes with data sources (Prometheus) and dashboards (`platform.json`, `deployments.json`). Users can instantly see the CPU usage of their dynamically deployed GitHub repositories.
 
-### 6. Code Quality & Static Analysis Pipeline
-**Technologies:** SonarQube Scanner, PostgreSQL.
-
-*   **Theoretical Perspective:**
-    Continuous Inspection ensures code quality does not degrade over time. SonarQube analyzes code for bugs, vulnerabilities, security hotspots, and code smells.
-*   **Practical Implementation:**
-    To prevent deployment bottlenecks, the SonarQube pipeline is **non-blocking**. While the Docker image is building, a parallel process runs the `sonar-scanner` CLI tool against the cloned repository. The results (Quality Gate status, bugs, vulnerabilities) are fetched via the SonarQube API, stored in a local PostgreSQL database via the `pgClient` service, and displayed on the frontend `CodeQuality.jsx` page.
-
 ---
 
 ## 🛡️ Security Architecture
@@ -257,7 +234,7 @@ WebLaunch/
 │       ├── App.jsx          # Main application component & routing
 │       ├── main.jsx         # React entry point
 │       ├── components/      # Reusable UI components (Cards, Layout)
-│       ├── pages/           # Route pages (Dashboard, CodeQuality)
+│       ├── pages/           # Route pages (Dashboard)
 │       └── utils/           # Helper functions
 │
 ├── backend/                 # Node.js Express Backend API
@@ -265,12 +242,10 @@ WebLaunch/
 │   ├── package.json         # Node dependencies
 │   └── src/
 │       ├── index.js         # Entry point, Express setup, Socket.IO init
-│       ├── routes/          # API endpoint controllers (deploy.js, sonar.js)
+│       ├── routes/          # API endpoint controllers (deploy.js)
 │       ├── services/        # Core business logic
 │       │   ├── dockerBuilder.js # Dockerode interaction logic
 │       │   ├── k8sClient.js     # Kubernetes API interaction
-│       │   ├── sonarScanner.js  # SonarQube analysis logic
-│       │   ├── pgClient.js      # PostgreSQL database interactions
 │       │   └── deploymentWorker.js # Bull queue processor
 │       └── utils/           # Helper functions (logger, file system)
 │
@@ -353,15 +328,7 @@ Open your web browser and navigate to:
     *   Generate and apply Kubernetes manifests.
 5.  **Access Your App:** Once deployment is complete, the dashboard will provide a clickable URL, formatted as `http://{repo-name}.localhost`. Click it to view your live, orchestrated application!
 
-### 3. Reviewing Code Quality
-1.  After a deployment completes, navigate to the **Code Quality** tab in the frontend.
-2.  The system will display a comprehensive SonarQube analysis of your deployed repository, highlighting:
-    *   Quality Gate Status (Pass/Fail)
-    *   Total Bugs and Vulnerabilities
-    *   Code Smells and Debt Ratio
-    *   Duplication percentage.
-
-### 4. Monitoring the Infrastructure
+### 3. Monitoring the Infrastructure
 1.  Navigate to Grafana (`http://localhost:3001`).
 2.  Open the **WebLaunch Platform** dashboard.
 3.  Here you can monitor the real-time resource consumption (CPU, Memory, Network TX/RX) of the underlying K3s cluster, the Redis queue length, and the performance of your dynamically deployed user applications.
